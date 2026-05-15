@@ -10,17 +10,27 @@ Gravity connects to your [Obsidian](https://obsidian.md) vault stored in S3, chu
 
 ## Architecture
 
-```
-React Frontend
-      ↓
-FastAPI Backend
-      ↓
-RAG Pipeline
-   ├── S3 Obsidian Vault
-   ├── Chunking & Embeddings (sentence-transformers)
-   ├── Vector Retrieval (PostgreSQL + pgvector)
-   ├── Prompt Builder
-   └── Local LLM (Ollama)
+```mermaid
+flowchart TD
+    UI["⚛️ React Frontend"]
+    API["⚡ FastAPI"]
+    S3["☁️ AWS S3"]
+    INGEST["🔄 Ingestion"]
+    EMBED["🧠 Embeddings"]
+    VEC["🗄️ Vector Store"]
+    PROMPT["📝 Prompt Builder"]
+    LLM["🤖 Local LLM"]
+
+    UI --> |"REST /chat"| API
+    API --> PROMPT
+    PROMPT --> |similarity search| VEC
+    PROMPT --> LLM
+    LLM --> |streamed response| API
+    API --> |streamed response| UI
+
+    S3 --> |pull markdown| INGEST
+    INGEST --> EMBED
+    EMBED --> |store vectors| VEC
 ```
 
 ## Tech Stack
@@ -38,12 +48,15 @@ RAG Pipeline
 
 ### Prerequisites
 
-- Python 3.11+
-- Docker (for PostgreSQL + pgvector)
-- [Ollama](https://ollama.com) installed and running
-- AWS credentials with S3 read access
+| Requirement                  | Version    | Notes                                 |
+| ---------------------------- | ---------- | ------------------------------------- |
+| Python                       | 3.11+      | [python.org](https://python.org)      |
+| Node.js                      | 18+        | [nodejs.org](https://nodejs.org)      |
+| Docker                       | any recent | For PostgreSQL + pgvector             |
+| [Ollama](https://ollama.com) | latest     | Local LLM runtime                     |
+| AWS credentials              | —          | S3 read access to your Obsidian vault |
 
-### 1 — Start the local LLM
+### 1 — Pull and serve the local LLM
 
 ```bash
 ollama pull llama3:8b-instruct-q4_K_M
@@ -53,65 +66,98 @@ ollama serve
 ### 2 — Start PostgreSQL + pgvector
 
 ```bash
-docker run -d \
-  --name pgvector \
-  -e POSTGRES_PASSWORD=password \
-  -p 5432:5432 \
-  ankane/pgvector
+docker-compose up -d
 ```
 
-Then create the schema:
-
-```sql
-CREATE EXTENSION vector;
-
-CREATE TABLE documents (
-    id           SERIAL PRIMARY KEY,
-    source_file  TEXT,
-    chunk_index  INT,
-    content      TEXT,
-    embedding    VECTOR(384),
-    created_at   TIMESTAMP DEFAULT NOW()
-);
-```
-
-### 3 — Setup venv & install Python dependencies
+### 3 — Install Python dependencies
 
 ```bash
 python -m venv .venv
-pip install -r requirements.txt
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+pip install -e .            # runtime deps
+pip install -e ".[dev]"     # + dev/test deps
 ```
 
 ### 4 — Configure environment
 
-Create a `.env` file:
+Shared defaults live in `.env`. Secrets go in `.env.local` (gitignored, loaded last and overrides `.env`).
+
+`.env` (safe to commit, edit as needed):
 
 ```env
-S3_BUCKET=your-obsidian-vault-bucket
+OLLAMA_MODEL=llama3:8b-instruct-q4_K_M
+OLLAMA_BASE_URL=http://localhost:11434
+EMBEDDING_MODEL=all-MiniLM-L6-v2
 AWS_REGION=us-east-1
-POSTGRES_DSN=postgresql://postgres:password@localhost:5432/postgres
-OLLAMA_URL=http://localhost:11434
+POSTGRES_HOST=localhost
+POSTGRES_PORT=5432
+POSTGRES_DB=gravity
+POSTGRES_USER=gravity
+```
+
+`.env.local` (secrets — never commit):
+
+```env
+POSTGRES_PASSWORD=your-db-password
+S3_BUCKET=your-obsidian-vault-bucket
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
 ```
 
 ### 5 — Ingest your vault
 
+Pulls markdown from S3, chunks it, generates embeddings, and writes to pgvector:
+
 ```bash
-python ingest.py
+gravity-ingest
 ```
 
-### 6 — Start the API
+### 6 — Start the backend
 
 ```bash
-uvicorn main:app --reload
+gravity-server
 ```
 
-### 7 — Open the UI
+API is available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
+
+### 7 — Start the frontend
 
 ```bash
-cd frontend && npm install && npm run dev
+cd ui && npm install && npm run dev
 ```
 
 Navigate to `http://localhost:5173`.
+
+---
+
+## Building & Testing
+
+### Run all tests
+
+```bash
+pytest
+```
+
+### Run a specific suite
+
+```bash
+pytest tests/server/     # backend tests
+pytest tests/ -v         # verbose output
+pytest -k test_name      # filter by test name
+```
+
+### Lint
+
+```bash
+ruff check .
+```
+
+### Build the frontend for production
+
+```bash
+cd ui && npm run build
+```
 
 ## Project Phases
 
