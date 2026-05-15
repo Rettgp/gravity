@@ -1,16 +1,12 @@
-# Gravity
-
-![Gravity Logo](gravity_logo.png)
-
-**Gravity** is a local-first, AI-powered home assistant that turns your private family knowledge base into a conversational interface — no cloud AI required.
-
----
+<div align="center">
+  <img src="logo.png" alt="Gravity Logo" width="512"/>
+  <p><em>A local-first, AI-powered home assistant that turns your private family knowledge base into a conversational interface - no cloud AI required.</em></p>
+  <!-- Badges -->
+</div>
 
 ## What It Does
 
 Gravity connects to your [Obsidian](https://obsidian.md) vault stored in S3, chunks and embeds your markdown notes, and lets you ask natural-language questions against that knowledge using a fully local LLM. Everything runs on your own hardware; your family's data never leaves your network.
-
----
 
 ## Architecture
 
@@ -27,20 +23,16 @@ RAG Pipeline
    └── Local LLM (Ollama)
 ```
 
----
-
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Frontend | React |
-| Backend API | FastAPI + Uvicorn |
-| Embeddings | `all-MiniLM-L6-v2` via sentence-transformers |
-| Vector Store | PostgreSQL + pgvector |
-| Local LLM | Ollama (`llama3:8b-instruct-q4_K_M`) |
-| Document Source | AWS S3 (Obsidian markdown vault) |
-
----
+| Layer           | Technology                                   |
+| --------------- | -------------------------------------------- |
+| Frontend        | React                                        |
+| Backend API     | FastAPI + Uvicorn                            |
+| Embeddings      | `all-MiniLM-L6-v2` via sentence-transformers |
+| Vector Store    | PostgreSQL + pgvector                        |
+| Local LLM       | Ollama (`llama3:8b-instruct-q4_K_M`)         |
+| Document Source | AWS S3 (Obsidian markdown vault)             |
 
 ## Getting Started
 
@@ -83,11 +75,11 @@ CREATE TABLE documents (
 );
 ```
 
-### 3 — Install Python dependencies
+### 3 — Setup venv & install Python dependencies
 
 ```bash
-pip install fastapi uvicorn psycopg2-binary sqlalchemy pgvector \
-            sentence-transformers boto3 requests python-dotenv
+python -m venv .venv
+pip install -r requirements.txt
 ```
 
 ### 4 — Configure environment
@@ -121,21 +113,17 @@ cd frontend && npm install && npm run dev
 
 Navigate to `http://localhost:5173`.
 
----
-
 ## Project Phases
 
-| Phase | Status | Description |
-|---|---|---|
-| 1 | Environment Setup | Ollama, PostgreSQL, pgvector |
-| 2 | S3 Loader | Pull markdown files from Obsidian S3 vault |
-| 3 | Chunking & Embeddings | Split docs, generate vectors |
-| 4 | Retrieval | pgvector similarity search |
-| 5 | LLM Integration | Ollama prompt construction & response |
-| 6 | FastAPI Backend | `/chat` endpoint wiring it all together |
-| 7 | React Frontend | Chat UI with source citations |
-
----
+| Phase | Status                | Description                                |
+| ----- | --------------------- | ------------------------------------------ |
+| 1     | Environment Setup     | Ollama, PostgreSQL, pgvector               |
+| 2     | S3 Loader             | Pull markdown files from Obsidian S3 vault |
+| 3     | Chunking & Embeddings | Split docs, generate vectors               |
+| 4     | Retrieval             | pgvector similarity search                 |
+| 5     | LLM Integration       | Ollama prompt construction & response      |
+| 6     | FastAPI Backend       | `/chat` endpoint wiring it all together    |
+| 7     | React Frontend        | Chat UI with source citations              |
 
 ## Planned Enhancements
 
@@ -145,8 +133,6 @@ Navigate to `http://localhost:5173`.
 - Cross-encoder reranking
 - Voice input / output
 - Mobile app
-
----
 
 ## License
 
