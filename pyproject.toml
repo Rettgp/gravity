@@ -1,0 +1,55 @@
+[project]
+name = "gravity"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    # AWS
+    "boto3",
+    # Embeddings
+    "sentence-transformers",
+    # PostgreSQL + pgvector
+    "psycopg[binary]",
+    "pgvector",
+    # LangChain ecosystem
+    "langchain",
+    "langchain-community",
+    "langchain-ollama",
+    "langgraph",
+    # Ollama
+    "ollama",
+    # MCP
+    "mcp[cli]",
+    # API server
+    "fastapi[standard]",
+    "uvicorn[standard]",
+    # Utilities
+    "python-dotenv",
+]
+
+[project.scripts]
+gravity-ingest  = "source_obsidian.ingest:main"
+gravity-agents  = "agents.server:main"
+gravity-server  = "server.main:start"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["source_obsidian*", "agents*", "server*"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-mock",
+    "httpx",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

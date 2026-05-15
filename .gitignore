@@ -1,0 +1,19 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.ruff_cache/
+
+# Secrets
+.env.local
+
+# Node
+ui/node_modules/
+ui/dist/
+
+# OS
+.DS_Store
