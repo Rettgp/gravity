@@ -1,6 +1,6 @@
 import os
 from typing import TypedDict
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_ollama import ChatOllama
 from langgraph.graph import StateGraph, END
 
@@ -38,7 +38,7 @@ def _generate(state: ChatState) -> ChatState:
         "context below. If the answer isn't in the context, say you do not know.\n\n"
         f"Context:\n{state['context']}"
     )
-    messages = [HumanMessage(content=system)]
+    messages = [SystemMessage(content=system)]
     for turn in state.get("history", []):
         messages.append(
             HumanMessage(content=turn["content"])

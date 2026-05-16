@@ -1,7 +1,7 @@
 import os
-from langchain_community.embeddings import SentenceTransformerEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 
 
-def get_embedder() -> SentenceTransformerEmbeddings:
+def get_embedder() -> HuggingFaceEmbeddings:
     model_name = os.environ.get("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
-    return SentenceTransformerEmbeddings(model_name=model_name)
+    return HuggingFaceEmbeddings(model_name=model_name)

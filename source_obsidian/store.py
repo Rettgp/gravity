@@ -1,4 +1,5 @@
 import os
+import numpy as np
 import psycopg
 from pgvector.psycopg import register_vector
 from langchain_core.documents import Document
@@ -34,10 +35,14 @@ def _connect() -> psycopg.Connection:
 
 
 def ensure_schema() -> None:
-    with _connect() as conn:
+    conn = psycopg.connect(_dsn())
+    with conn:
         conn.execute(_CREATE_EXTENSION)
+        conn.commit()
+        register_vector(conn)
         conn.execute(_CREATE_TABLE)
         conn.commit()
+    conn.close()
 
 
 def upsert_documents(docs: list[Document], embedder: Embeddings) -> None:
@@ -49,13 +54,13 @@ def upsert_documents(docs: list[Document], embedder: Embeddings) -> None:
             conn.execute(
                 "INSERT INTO documents (source_file, chunk_index, content, embedding) "
                 "VALUES (%s, %s, %s, %s)",
-                (doc.metadata.get("source"), i, doc.page_content, vec),
+                (doc.metadata.get("source"), i, doc.page_content, np.array(vec)),
             )
         conn.commit()
 
 
 def similarity_search(query: str, embedder: Embeddings, k: int = 5) -> list[Document]:
-    vec = embedder.embed_query(query)
+    vec = np.array(embedder.embed_query(query))
     with _connect() as conn:
         rows = conn.execute(
             "SELECT content, source_file FROM documents "
