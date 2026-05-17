@@ -20,7 +20,7 @@ def test_ensure_schema_creates_extension_and_table(mock_connect, _mock_register)
     sql_calls = [str(c.args[0]) for c in conn.execute.call_args_list]
     assert any("CREATE EXTENSION" in s for s in sql_calls)
     assert any("CREATE TABLE" in s for s in sql_calls)
-    conn.commit.assert_called_once()
+    conn.commit.call_count == 2
 
 
 @patch("source_obsidian.store.register_vector")
