@@ -173,7 +173,9 @@ cd ui && npm run build
 
 ## Planned Enhancements
 
-- Supervisor agent for multi-step reasoning
+- Streaming replies
+- Clean up ReAct thought processing so its not in the final reply
+- Action based plans for modifying docs
 - Homebridge integration for smart home control
 - Hybrid retrieval (BM25 + vector)
 - Cross-encoder reranking

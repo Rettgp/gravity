@@ -1,11 +1,11 @@
 import os
-from typing import TypedDict
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from langchain_ollama import ChatOllama
-from langgraph.graph import StateGraph, END
+from pathlib import Path
 
-from source_obsidian.embedder import get_embedder
-from source_obsidian.store import similarity_search
+from langchain.agents import create_agent
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_ollama import ChatOllama
+
+from agents.family_docs import search_family_docs
 
 
 def _get_llm() -> ChatOllama:
@@ -15,51 +15,51 @@ def _get_llm() -> ChatOllama:
     )
 
 
-class ChatState(TypedDict):
-    question: str
-    history: list[dict]
-    context: str
-    sources: list[str]
-    answer: str
+def _load_prompt() -> str:
+    path = Path(os.environ.get("PIPELINE_PROMPT_FILE", "prompts/pipeline.md"))
+    return path.read_text(encoding="utf-8")
 
 
-def _retrieve(state: ChatState) -> ChatState:
-    embedder = get_embedder()
-    docs = similarity_search(state["question"], embedder, k=5)
-    state["context"] = "\n\n".join(d.page_content for d in docs)
-    state["sources"] = [d.metadata.get("source", "") for d in docs]
-    return state
+def _extract_sources(messages: list) -> list[str]:
+    sources = []
+    for msg in messages:
+        if isinstance(msg, ToolMessage):
+            for line in msg.content.split("\n"):
+                stripped = line.strip()
+                if stripped.startswith("[") and stripped.endswith("]"):
+                    source = stripped[1:-1]
+                    if source not in sources:
+                        sources.append(source)
+    return sources
 
 
-def _generate(state: ChatState) -> ChatState:
-    llm = _get_llm()
-    system = (
-        "You are a helpful family assistant. Answer the question using only the "
-        "context below. If the answer isn't in the context, say you do not know.\n\n"
-        f"Context:\n{state['context']}"
-    )
-    messages = [SystemMessage(content=system)]
-    for turn in state.get("history", []):
-        messages.append(
-            HumanMessage(content=turn["content"])
-            if turn["role"] == "user"
-            else AIMessage(content=turn["content"])
-        )
-    messages.append(HumanMessage(content=state["question"]))
+class Pipeline:
+    def __init__(self) -> None:
+        self._agent = None
 
-    response = llm.invoke(messages)
-    state["answer"] = response.content
-    return state
+    def _get_agent(self):
+        if self._agent is None:
+            self._agent = create_agent(
+                _get_llm(),
+                [search_family_docs],
+                system_prompt=_load_prompt(),
+            )
+        return self._agent
 
+    async def ainvoke(self, state: dict) -> dict:
+        messages = []
+        for turn in state.get("history", []):
+            if turn["role"] == "user":
+                messages.append(HumanMessage(content=turn["content"]))
+            else:
+                messages.append(AIMessage(content=turn["content"]))
+        messages.append(HumanMessage(content=state["question"]))
 
-def build_pipeline():
-    graph = StateGraph(ChatState)
-    graph.add_node("retrieve", _retrieve)
-    graph.add_node("generate", _generate)
-    graph.set_entry_point("retrieve")
-    graph.add_edge("retrieve", "generate")
-    graph.add_edge("generate", END)
-    return graph.compile()
+        result = await self._get_agent().ainvoke({"messages": messages})
+        answer = result["messages"][-1].content
+        sources = _extract_sources(result["messages"])
+
+        return {**state, "answer": answer, "sources": sources}
 
 
-pipeline = build_pipeline()
+pipeline = Pipeline()

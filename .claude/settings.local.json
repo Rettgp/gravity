@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Set-Location d:\\\\Projects\\\\gravity; $python = \"d:\\\\Projects\\\\gravity\\\\.venv\\\\Scripts\\\\python.exe\"; & $python -m pytest tests/agents/test_family_docs.py tests/server/test_pipeline.py -v 2>&1)",
+      "PowerShell(ollama pull llama3.1:8b-instruct-q4_K_M 2>&1)"
+    ]
+  }
+}
