@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
-from agents import family_docs
+from agents import family_docs, wardrobe
 
 
 def main() -> None:
@@ -12,6 +12,7 @@ def main() -> None:
     transport = os.environ.get("MCP_TRANSPORT", "stdio")
     mcp = FastMCP("gravity-agents")
     family_docs.register(mcp)
+    wardrobe.register(mcp)
     mcp.run(transport=transport)
 
 

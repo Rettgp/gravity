@@ -28,16 +28,18 @@ dependencies = [
 ]
 
 [project.scripts]
-gravity-ingest  = "source_obsidian.ingest:main"
-gravity-agents  = "agents.server:main"
-gravity-server  = "server.main:start"
+gravity-ingest           = "source_obsidian.ingest:main"
+gravity-wardrobe-ingest  = "source_wardrobe.ingest:main"
+gravity-wardrobe-pose    = "source_wardrobe.pose_ingest:main"
+gravity-agents           = "agents.server:main"
+gravity-server           = "server.main:start"
 
 [build-system]
 requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["source_obsidian*", "agents*", "server*"]
+include = ["source_obsidian*", "source_wardrobe*", "agents*", "server*"]
 
 [project.optional-dependencies]
 dev = [

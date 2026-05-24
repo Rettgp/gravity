@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from agents.family_docs import search_family_docs
-from server.pipeline import Pipeline, _extract_sources
+from server.pipeline import Pipeline, _extract_item_ids, _extract_sources
 
 
 # --- _extract_sources ---
@@ -44,6 +44,47 @@ def test_extract_sources_returns_empty_when_no_tool_messages():
     assert _extract_sources([HumanMessage(content="hi"), AIMessage(content="hello")]) == []
 
 
+def test_extract_sources_ignores_items_tags():
+    msgs = [
+        ToolMessage(content="[ITEMS:1,2,3]\nsome outfit content", tool_call_id="1"),
+    ]
+    # ITEMS tags should not appear in sources
+    assert _extract_sources(msgs) == []
+
+
+# --- _extract_item_ids ---
+
+def test_extract_item_ids_parses_single_tag():
+    msgs = [AIMessage(content="Great outfit! [ITEMS:1,5,9]")]
+    assert _extract_item_ids(msgs) == [1, 5, 9]
+
+
+def test_extract_item_ids_parses_tag_from_tool_message():
+    msgs = [ToolMessage(content="Navy blazer + jeans. [ITEMS:3,7]", tool_call_id="1")]
+    assert _extract_item_ids(msgs) == [3, 7]
+
+
+def test_extract_item_ids_deduplicates_across_messages():
+    msgs = [
+        ToolMessage(content="[ITEMS:1,2]", tool_call_id="1"),
+        AIMessage(content="[ITEMS:2,3]"),
+    ]
+    ids = _extract_item_ids(msgs)
+    assert ids.count(2) == 1
+    assert 1 in ids
+    assert 3 in ids
+
+
+def test_extract_item_ids_returns_empty_when_no_tags():
+    msgs = [HumanMessage(content="hi"), AIMessage(content="hello")]
+    assert _extract_item_ids(msgs) == []
+
+
+def test_extract_item_ids_handles_single_id():
+    msgs = [AIMessage(content="Wear this. [ITEMS:42]")]
+    assert _extract_item_ids(msgs) == [42]
+
+
 # --- search_family_docs tool ---
 
 @patch("agents.family_docs.raw_search", return_value="[docs.md]\nsome content")
@@ -63,26 +104,50 @@ def _make_pipeline_with_mock_agent(return_messages: list) -> Pipeline:
     return p
 
 
-def test_ainvoke_extracts_answer_from_last_message():
+@patch("server.pipeline._build_outfit_items", return_value=[])
+def test_ainvoke_extracts_answer_from_last_message(_mock_build):
     p = _make_pipeline_with_mock_agent([
         HumanMessage(content="question"),
         AIMessage(content="The answer is 42."),
     ])
-    result = asyncio.run(p.ainvoke({"question": "q?", "history": [], "context": "", "sources": [], "answer": ""}))
+    result = asyncio.run(p.ainvoke({
+        "question": "q?", "history": [], "context": "", "sources": [], "answer": "",
+        "outfit_items": [],
+    }))
     assert result["answer"] == "The answer is 42."
 
 
-def test_ainvoke_extracts_sources_from_tool_messages():
+@patch("server.pipeline._build_outfit_items", return_value=[])
+def test_ainvoke_extracts_sources_from_tool_messages(_mock_build):
     p = _make_pipeline_with_mock_agent([
         HumanMessage(content="question"),
         ToolMessage(content="[family.md]\ncontent", tool_call_id="1"),
         AIMessage(content="answer"),
     ])
-    result = asyncio.run(p.ainvoke({"question": "q?", "history": [], "context": "", "sources": [], "answer": ""}))
+    result = asyncio.run(p.ainvoke({
+        "question": "q?", "history": [], "context": "", "sources": [], "answer": "",
+        "outfit_items": [],
+    }))
     assert result["sources"] == ["family.md"]
 
 
-def test_ainvoke_passes_history_as_messages():
+@patch("server.pipeline._build_outfit_items", return_value=[
+    {"item_id": 1, "label": "Navy blazer", "image_url": "/api/wardrobe/image/1"}
+])
+def test_ainvoke_returns_outfit_items_when_items_tag_present(_mock_build):
+    p = _make_pipeline_with_mock_agent([
+        AIMessage(content="Wear the navy blazer. [ITEMS:1]"),
+    ])
+    result = asyncio.run(p.ainvoke({
+        "question": "q?", "history": [], "context": "", "sources": [], "answer": "",
+        "outfit_items": [],
+    }))
+    assert len(result["outfit_items"]) == 1
+    assert result["outfit_items"][0]["item_id"] == 1
+
+
+@patch("server.pipeline._build_outfit_items", return_value=[])
+def test_ainvoke_passes_history_as_messages(_mock_build):
     mock_agent = MagicMock()
     mock_agent.ainvoke = AsyncMock(return_value={
         "messages": [AIMessage(content="ok")]
@@ -99,10 +164,10 @@ def test_ainvoke_passes_history_as_messages():
         "context": "",
         "sources": [],
         "answer": "",
+        "outfit_items": [],
     }))
 
     invoked_messages = mock_agent.ainvoke.call_args[0][0]["messages"]
-    # 2 history turns + current question
     assert len(invoked_messages) == 3
     assert isinstance(invoked_messages[0], HumanMessage)
     assert isinstance(invoked_messages[1], AIMessage)
@@ -110,8 +175,35 @@ def test_ainvoke_passes_history_as_messages():
     assert invoked_messages[2].content == "follow up?"
 
 
-def test_ainvoke_preserves_existing_state_keys():
+@patch("server.pipeline._build_outfit_items", return_value=[])
+def test_ainvoke_prepends_image_description_when_provided(_mock_build):
+    mock_agent = MagicMock()
+    mock_agent.ainvoke = AsyncMock(return_value={"messages": [AIMessage(content="ok")]})
+    p = Pipeline()
+    p._agent = mock_agent
+
+    asyncio.run(p.ainvoke({
+        "question": "Does this match anything?",
+        "image_description": "A red polo shirt.",
+        "history": [],
+        "context": "",
+        "sources": [],
+        "answer": "",
+        "outfit_items": [],
+    }))
+
+    msgs = mock_agent.ainvoke.call_args[0][0]["messages"]
+    last_human = msgs[-1]
+    assert "red polo shirt" in last_human.content
+    assert "Does this match anything?" in last_human.content
+
+
+@patch("server.pipeline._build_outfit_items", return_value=[])
+def test_ainvoke_preserves_existing_state_keys(_mock_build):
     p = _make_pipeline_with_mock_agent([AIMessage(content="answer")])
-    state = {"question": "q?", "history": [], "context": "old", "sources": ["x.md"], "answer": ""}
+    state = {
+        "question": "q?", "history": [], "context": "old", "sources": ["x.md"],
+        "answer": "", "outfit_items": [],
+    }
     result = asyncio.run(p.ainvoke(state))
     assert result["context"] == "old"

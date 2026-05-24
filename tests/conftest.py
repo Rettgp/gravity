@@ -14,3 +14,5 @@ def env_vars(monkeypatch):
     monkeypatch.setenv("POSTGRES_USER", "gravity")
     monkeypatch.setenv("POSTGRES_PASSWORD", "testpassword")
     monkeypatch.setenv("S3_BUCKET", "test-bucket")
+    monkeypatch.setenv("OLLAMA_VISION_MODEL", "test-vision-model")
+    monkeypatch.setenv("WARDROBE_IMAGE_STORE", "/tmp/test-wardrobe")
