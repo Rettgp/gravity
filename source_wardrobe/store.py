@@ -105,6 +105,14 @@ def person_exists(label: str) -> bool:
     return row is not None
 
 
+def get_all_persons() -> list[dict]:
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT label, display_name FROM wardrobe_persons ORDER BY label"
+        ).fetchall()
+    return [{"label": row[0], "display_name": row[1]} for row in rows]
+
+
 def get_person(label: str) -> dict | None:
     with _connect() as conn:
         row = conn.execute(

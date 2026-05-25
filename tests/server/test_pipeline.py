@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from agents.family_docs import search_family_docs
-from server.pipeline import Pipeline, _extract_item_ids, _extract_sources
+from server.pipeline import Pipeline, _build_messages, _extract_item_ids, _extract_sources
 
 
 # --- _extract_sources ---
@@ -207,3 +207,88 @@ def test_ainvoke_preserves_existing_state_keys(_mock_build):
     }
     result = asyncio.run(p.ainvoke(state))
     assert result["context"] == "old"
+
+
+# --- _build_messages ---
+
+def test_build_messages_converts_history_and_question():
+    msgs = _build_messages({
+        "question": "What's next?",
+        "history": [
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi there"},
+        ],
+    })
+    assert len(msgs) == 3
+    assert isinstance(msgs[0], HumanMessage)
+    assert isinstance(msgs[1], AIMessage)
+    assert msgs[2].content == "What's next?"
+
+
+def test_build_messages_prepends_image_description():
+    msgs = _build_messages({
+        "question": "Does this match?",
+        "image_description": "A red polo shirt.",
+        "history": [],
+    })
+    assert "red polo shirt" in msgs[-1].content
+    assert "Does this match?" in msgs[-1].content
+
+
+# --- Pipeline.astream ---
+
+@patch("server.pipeline.create_agent")
+@patch("server.pipeline._build_outfit_items", return_value=[])
+def test_astream_yields_result_event(mock_build, mock_create_agent):
+    mock_agent = MagicMock()
+    mock_agent.ainvoke = AsyncMock(return_value={
+        "messages": [AIMessage(content="Wear the blue shirt.")]
+    })
+    mock_create_agent.return_value = mock_agent
+
+    async def run():
+        p = Pipeline()
+        events = []
+        async for event in p.astream({
+            "question": "q?", "history": [], "context": "",
+            "sources": [], "answer": "", "outfit_items": [],
+        }):
+            events.append(event)
+        return events
+
+    events = asyncio.run(run())
+    result_events = [e for e in events if e["type"] == "result"]
+    assert len(result_events) == 1
+    assert result_events[0]["answer"] == "Wear the blue shirt."
+
+
+@patch("server.pipeline.create_agent")
+@patch("server.pipeline._build_outfit_items", return_value=[
+    {"item_id": 3, "label": "Blue blazer", "image_url": "/api/wardrobe/image/3", "person_label": "garrett"}
+])
+def test_astream_relays_wardrobe_tool_message_verbatim(mock_build, mock_create_agent):
+    """When a ToolMessage contains [ITEMS:...], astream uses it as the answer."""
+    mock_agent = MagicMock()
+    mock_agent.ainvoke = AsyncMock(return_value={
+        "messages": [
+            ToolMessage(content="Wear the blue blazer. [ITEMS:3]", tool_call_id="1"),
+            AIMessage(content="I recommend wearing the blue blazer."),  # supervisor rewrite
+        ]
+    })
+    mock_create_agent.return_value = mock_agent
+
+    async def run():
+        p = Pipeline()
+        events = []
+        async for event in p.astream({
+            "question": "q?", "history": [], "context": "",
+            "sources": [], "answer": "", "outfit_items": [],
+        }):
+            events.append(event)
+        return events
+
+    events = asyncio.run(run())
+    result = next(e for e in events if e["type"] == "result")
+    # Verbatim wardrobe response, not supervisor's rewrite
+    assert result["answer"] == "Wear the blue blazer. [ITEMS:3]"
+    assert len(result["outfit_items"]) == 1

@@ -1,7 +1,5 @@
 from unittest.mock import MagicMock, patch
 
-from langchain_core.messages import HumanMessage
-
 from agents import wardrobe
 
 
@@ -183,31 +181,6 @@ def test_mcp_tool_delegates_to_run_agent(mock_run_agent):
     assert "Navy blazer" in result
 
 
-# --- _collect_observed_ids ---
-
-def test_collect_observed_ids_extracts_ids_from_observations():
-    messages = [
-        HumanMessage(content="Observation: - id:1 | tops | White shirt\n- id:3 | bottoms | Dark jeans")
-    ]
-    ids = wardrobe._collect_observed_ids(messages)
-    assert ids == {1, 3}
-
-
-def test_collect_observed_ids_ignores_non_observation_messages():
-    messages = [
-        HumanMessage(content="id:99 is not in an observation"),
-        HumanMessage(content="Observation: - id:5 | tops | Blue polo"),
-    ]
-    ids = wardrobe._collect_observed_ids(messages)
-    assert ids == {5}
-    assert 99 not in ids
-
-
-def test_collect_observed_ids_returns_empty_when_no_tools_called():
-    messages = [HumanMessage(content="Some other content")]
-    assert wardrobe._collect_observed_ids(messages) == set()
-
-
 # --- _filter_items_tag ---
 
 def test_filter_items_tag_keeps_valid_ids():
@@ -231,189 +204,133 @@ def test_filter_items_tag_no_op_when_no_tag():
     assert wardrobe._filter_items_tag(text, {1, 2}) == text
 
 
-# --- _parse_action ---
+# --- _find_person_label ---
 
-def test_parse_action_extracts_tool_name_and_args():
-    text = (
-        "Thought: I need the profile.\n"
-        'Action: get_person_profile\n'
-        'Action Input: {"person_label": "garrett"}\n'
-    )
-    result = wardrobe._parse_action(text)
-    assert result is not None
-    name, args = result
-    assert name == "get_person_profile"
-    assert args == {"person_label": "garrett"}
+def test_find_person_label_matches_label_in_query():
+    with patch("agents.wardrobe.store.get_all_persons") as mock:
+        mock.return_value = [{"label": "garrett", "display_name": "Garrett"}]
+        assert wardrobe._find_person_label("What should garrett wear?") == "garrett"
 
 
-def test_parse_action_returns_none_when_no_action():
-    text = "Thought: I already have enough information.\nFinal Answer: Wear the blue shirt."
-    assert wardrobe._parse_action(text) is None
+def test_find_person_label_matches_display_name_in_query():
+    with patch("agents.wardrobe.store.get_all_persons") as mock:
+        mock.return_value = [{"label": "garrett", "display_name": "Garrett"}]
+        assert wardrobe._find_person_label("Outfit ideas for Garrett this summer") == "garrett"
 
 
-def test_parse_action_returns_last_action_when_multiple():
-    text = (
-        'Action: get_person_profile\nAction Input: {"person_label": "garrett"}\n'
-        "Observation: Athletic build.\n"
-        'Action: search_wardrobe_items\nAction Input: {"person_label": "garrett", "query": "formal"}\n'
-    )
-    result = wardrobe._parse_action(text)
-    assert result is not None
-    name, args = result
-    assert name == "search_wardrobe_items"
-    assert args["query"] == "formal"
+def test_find_person_label_returns_none_when_no_match():
+    with patch("agents.wardrobe.store.get_all_persons") as mock:
+        mock.return_value = [{"label": "garrett", "display_name": "Garrett"}]
+        assert wardrobe._find_person_label("What is the weather today?") is None
 
 
-def test_parse_action_handles_invalid_json_gracefully():
-    text = "Action: get_person_profile\nAction Input: not-json\n"
-    result = wardrobe._parse_action(text)
-    # Returns the tool name with empty args rather than crashing
-    assert result is not None
-    name, args = result
-    assert name == "get_person_profile"
-    assert args == {}
+def test_find_person_label_returns_none_when_no_persons():
+    with patch("agents.wardrobe.store.get_all_persons", return_value=[]):
+        assert wardrobe._find_person_label("What should Garrett wear?") is None
 
 
 # --- run_agent ---
 
-def test_run_agent_returns_final_answer_after_item_tool_call():
-    """Agent returns the text after 'Final Answer:' once an item-search tool has been called.
-    When the catalog returns no items (observed is empty), no [ITEMS:] retry is triggered."""
-    tool_mock = MagicMock()
-    tool_mock.invoke.return_value = "No items found."  # empty catalog — no id: in observation
+_SAMPLE_PERSON = {
+    "label": "garrett",
+    "display_name": "Garrett",
+    "pose_image_path": None,
+    "pose_description": "Athletic build, average height.",
+}
 
-    first_response = MagicMock()
-    first_response.content = (
-        "Thought: I need to look at Garrett's wardrobe.\n"
-        'Action: get_wardrobe_catalog\n'
-        'Action Input: {"person_label": "garrett"}\n'
-    )
-    second_response = MagicMock()
-    second_response.content = "Final Answer: Your wardrobe has no items for this season."
+_SAMPLE_ITEMS = [
+    {
+        "id": 1, "category": "tops", "description": "Blue t-shirt",
+        "colors": ["blue"], "seasons": ["summer"], "occasions": ["casual"],
+    },
+    {
+        "id": 2, "category": "bottoms", "description": "Khaki shorts",
+        "colors": ["khaki"], "seasons": ["summer"], "occasions": ["casual"],
+    },
+]
 
-    with patch("agents.wardrobe._get_llm") as mock_llm, \
-         patch.dict("agents.wardrobe._TOOLS", {"get_wardrobe_catalog": tool_mock}):
-        mock_llm.return_value.invoke.side_effect = [first_response, second_response]
+_GARRETT = [{"label": "garrett", "display_name": "Garrett"}]
+
+
+def test_run_agent_returns_no_person_message_when_no_person_in_query():
+    with patch("agents.wardrobe.store.get_all_persons", return_value=[]):
+        result = wardrobe.run_agent("What should I wear today?")
+    assert "name" in result.lower() or "person" in result.lower()
+
+
+def test_run_agent_returns_no_items_when_catalog_empty():
+    with patch("agents.wardrobe.store.get_all_persons", return_value=_GARRETT), \
+         patch("agents.wardrobe.store.get_person", return_value=_SAMPLE_PERSON), \
+         patch("agents.wardrobe.store.get_catalog", return_value=[]):
         result = wardrobe.run_agent("What should Garrett wear?")
+    assert any(w in result.lower() for w in ["no wardrobe", "not found", "no items"])
 
-    assert result == "Your wardrobe has no items for this season."
+
+def test_run_agent_makes_exactly_one_llm_call():
+    """The pre-load approach makes a single LLM call — no ReAct loop."""
+    with patch("agents.wardrobe.store.get_all_persons", return_value=_GARRETT), \
+         patch("agents.wardrobe.store.get_person", return_value=_SAMPLE_PERSON), \
+         patch("agents.wardrobe.store.get_catalog", return_value=_SAMPLE_ITEMS), \
+         patch("agents.wardrobe._get_llm") as mock_llm:
+        mock_llm.return_value.invoke.return_value = MagicMock(content="Great summer look. [ITEMS:1,2]")
+        result = wardrobe.run_agent("What should Garrett wear in summer?")
+    assert mock_llm.return_value.invoke.call_count == 1
+    assert "[ITEMS:1,2]" in result
 
 
-def test_run_agent_injects_correction_when_no_item_tool_called():
-    """If the model gives a Final Answer without calling a wardrobe-search tool
-    (even if get_person_profile was called), a correction is injected."""
-    catalog_mock = MagicMock()
-    catalog_mock.invoke.return_value = "- id:7 | tops | Blue shirt [colors: blue, seasons: summer]"
-
-    # First call: only calls get_person_profile — blocked because no item lookup done
-    first_response = MagicMock()
-    first_response.content = "Final Answer: Wear something blue."
-    # Second call: model now calls catalog tool after correction
-    second_response = MagicMock()
-    second_response.content = (
-        "Thought: I need to look up wardrobe items.\n"
-        'Action: get_wardrobe_catalog\n'
-        'Action Input: {"person_label": "garrett"}\n'
-    )
-    # Third call: final answer after seeing real items
-    third_response = MagicMock()
-    third_response.content = "Final Answer: Wear the blue shirt. [ITEMS:7]"
-
-    with patch("agents.wardrobe._get_llm") as mock_llm, \
-         patch.dict("agents.wardrobe._TOOLS", {"get_wardrobe_catalog": catalog_mock}):
-        mock_llm.return_value.invoke.side_effect = [first_response, second_response, third_response]
+def test_run_agent_filters_hallucinated_ids():
+    """IDs in [ITEMS:...] that are not in the catalog are removed."""
+    with patch("agents.wardrobe.store.get_all_persons", return_value=_GARRETT), \
+         patch("agents.wardrobe.store.get_person", return_value=_SAMPLE_PERSON), \
+         patch("agents.wardrobe.store.get_catalog", return_value=_SAMPLE_ITEMS), \
+         patch("agents.wardrobe._get_llm") as mock_llm:
+        mock_llm.return_value.invoke.return_value = MagicMock(content="Great look. [ITEMS:1,99,100]")
         result = wardrobe.run_agent("What should Garrett wear?")
-
-    assert mock_llm.return_value.invoke.call_count == 3
-    catalog_mock.invoke.assert_called_once()
-    assert "[ITEMS:7]" in result
-
-
-def test_run_agent_forces_retry_when_items_tag_missing_after_lookup():
-    """If the model called an item-search tool (observed IDs exist) but its Final Answer
-    omits the [ITEMS:...] tag entirely, a correction is injected listing the valid IDs."""
-    tool_mock = MagicMock()
-    tool_mock.invoke.return_value = "- id:7 | tops | Blue shirt [colors: blue, seasons: summer]"
-
-    first_response = MagicMock()
-    first_response.content = (
-        'Action: get_wardrobe_catalog\n'
-        'Action Input: {"person_label": "garrett"}\n'
-    )
-    # Model gives Final Answer but forgets [ITEMS:] tag
-    second_response = MagicMock()
-    second_response.content = "Final Answer: Wear the blue shirt."
-    # After correction, model includes the tag
-    third_response = MagicMock()
-    third_response.content = "Final Answer: Wear the blue shirt. [ITEMS:7]"
-
-    with patch("agents.wardrobe._get_llm") as mock_llm, \
-         patch.dict("agents.wardrobe._TOOLS", {"get_wardrobe_catalog": tool_mock}):
-        mock_llm.return_value.invoke.side_effect = [first_response, second_response, third_response]
-        result = wardrobe.run_agent("What should Garrett wear?")
-
-    assert mock_llm.return_value.invoke.call_count == 3
-    assert "[ITEMS:7]" in result
-
-
-def test_run_agent_forces_retry_when_all_ids_are_hallucinated():
-    """If the model includes [ITEMS:...] but ALL IDs are hallucinated (not in observations),
-    the filter strips the tag and a correction is injected with the real IDs."""
-    tool_mock = MagicMock()
-    tool_mock.invoke.return_value = "- id:7 | tops | Blue shirt [colors: blue, seasons: summer]"
-
-    first_response = MagicMock()
-    first_response.content = (
-        'Action: get_wardrobe_catalog\n'
-        'Action Input: {"person_label": "garrett"}\n'
-    )
-    # Model invents an ID that wasn't in the observation
-    second_response = MagicMock()
-    second_response.content = "Final Answer: Wear the white shirt. [ITEMS:99]"
-    # After correction, model uses the real ID
-    third_response = MagicMock()
-    third_response.content = "Final Answer: Wear the blue shirt. [ITEMS:7]"
-
-    with patch("agents.wardrobe._get_llm") as mock_llm, \
-         patch.dict("agents.wardrobe._TOOLS", {"get_wardrobe_catalog": tool_mock}):
-        mock_llm.return_value.invoke.side_effect = [first_response, second_response, third_response]
-        result = wardrobe.run_agent("What should Garrett wear?")
-
-    assert mock_llm.return_value.invoke.call_count == 3
-    assert "[ITEMS:7]" in result
+    assert "[ITEMS:1]" in result
     assert "99" not in result
+    assert "100" not in result
 
 
-def test_run_agent_calls_tool_and_continues():
-    tool_mock = MagicMock()
-    # Observation contains id:3 so it passes the hallucination filter
-    tool_mock.invoke.return_value = "- id:3 | outerwear | Blue blazer [colors: blue, seasons: fall]"
-
-    first_response = MagicMock()
-    first_response.content = (
-        "Thought: Need catalog.\n"
-        'Action: get_wardrobe_catalog\n'
-        'Action Input: {"person_label": "garrett"}\n'
-    )
-    second_response = MagicMock()
-    second_response.content = "Final Answer: Wear the blue blazer. [ITEMS:3]"
-
-    with patch("agents.wardrobe._get_llm") as mock_llm, \
-         patch.dict("agents.wardrobe._TOOLS", {"get_wardrobe_catalog": tool_mock}):
-        mock_llm.return_value.invoke.side_effect = [first_response, second_response]
+def test_run_agent_strips_final_answer_prefix():
+    """If the model wraps its response in 'Final Answer:', it is stripped."""
+    with patch("agents.wardrobe.store.get_all_persons", return_value=_GARRETT), \
+         patch("agents.wardrobe.store.get_person", return_value=_SAMPLE_PERSON), \
+         patch("agents.wardrobe.store.get_catalog", return_value=_SAMPLE_ITEMS), \
+         patch("agents.wardrobe._get_llm") as mock_llm:
+        mock_llm.return_value.invoke.return_value = MagicMock(
+            content="Final Answer: Great summer look. [ITEMS:1,2]"
+        )
         result = wardrobe.run_agent("What should Garrett wear?")
-
-    tool_mock.invoke.assert_called_once_with({"person_label": "garrett"})
-    assert "blue blazer" in result
-    assert "[ITEMS:3]" in result
+    assert "Final Answer:" not in result
+    assert "[ITEMS:1,2]" in result
 
 
-def test_run_agent_returns_content_when_no_action_or_final_answer():
-    with patch("agents.wardrobe._get_llm") as mock_llm:
-        mock_response = MagicMock()
-        mock_response.content = "I don't know what to do."
-        mock_llm.return_value.invoke.return_value = mock_response
+def test_run_agent_catalog_injected_as_context_not_tool_called():
+    """The catalog is loaded programmatically and passed as LLM context.
+    No wardrobe tool functions are invoked during run_agent."""
+    with patch("agents.wardrobe.store.get_all_persons", return_value=_GARRETT), \
+         patch("agents.wardrobe.store.get_person", return_value=_SAMPLE_PERSON), \
+         patch("agents.wardrobe.store.get_catalog", return_value=_SAMPLE_ITEMS) as mock_catalog, \
+         patch("agents.wardrobe._get_llm") as mock_llm, \
+         patch("agents.wardrobe.get_wardrobe_catalog") as mock_tool:
+        mock_llm.return_value.invoke.return_value = MagicMock(content="Nice. [ITEMS:1]")
+        wardrobe.run_agent("What should Garrett wear?")
+    mock_catalog.assert_called_once_with("garrett")   # store called directly
+    mock_tool.invoke.assert_not_called()              # LangChain tool NOT invoked
 
-        result = wardrobe.run_agent("What should Garrett wear?")
 
-    assert result == "I don't know what to do."
+def test_run_agent_emits_profile_and_catalog_steps():
+    """on_step receives action+observation events for both profile and catalog loading."""
+    collected: list[dict] = []
+    with patch("agents.wardrobe.store.get_all_persons", return_value=_GARRETT), \
+         patch("agents.wardrobe.store.get_person", return_value=_SAMPLE_PERSON), \
+         patch("agents.wardrobe.store.get_catalog", return_value=_SAMPLE_ITEMS), \
+         patch("agents.wardrobe._get_llm") as mock_llm:
+        mock_llm.return_value.invoke.return_value = MagicMock(content="Looks great. [ITEMS:1]")
+        wardrobe.run_agent("What should Garrett wear?", on_step=collected.append)
+
+    tools_called = [s["tool"] for s in collected if s.get("step_type") == "action"]
+    assert "get_person_profile" in tools_called
+    assert "get_wardrobe_catalog" in tools_called
+    observations = [s for s in collected if s.get("step_type") == "observation"]
+    assert len(observations) >= 2

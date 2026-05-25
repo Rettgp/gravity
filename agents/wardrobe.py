@@ -1,15 +1,18 @@
-import json
+import logging
 import os
 import re
+from collections.abc import Callable
 from pathlib import Path
 
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.tools import tool
 from langchain_ollama import ChatOllama
 from mcp.server.fastmcp import FastMCP
 
 from source_obsidian.embedder import get_embedder
 from source_wardrobe import store
+
+logger = logging.getLogger("gravity.wardrobe")
 
 _embedder = None
 
@@ -23,7 +26,6 @@ def _get_embedder():
 
 def _get_llm() -> ChatOllama:
     # Vision model handles text reasoning too and supports future image-in-chat.
-    # It does NOT support Ollama's native tools API, so we use a manual ReAct loop.
     model = os.environ.get("OLLAMA_VISION_MODEL", os.environ["OLLAMA_MODEL"])
     return ChatOllama(
         model=model,
@@ -49,6 +51,27 @@ def _format_items(items: list[dict]) -> str:
             f"[colors: {colors}, seasons: {seasons}, occasions: {occasions}]"
         )
     return "\n".join(lines)
+
+
+def _filter_items_tag(text: str, valid_ids: set[int]) -> str:
+    """Remove any item IDs from [ITEMS:...] that are not in valid_ids.
+
+    If no valid IDs remain the tag is removed entirely so no OutfitCard is shown.
+    """
+    def _replace(m: re.Match) -> str:
+        kept = [i for i in m.group(1).split(",") if i.strip().isdigit() and int(i.strip()) in valid_ids]
+        return f"[ITEMS:{','.join(kept)}]" if kept else ""
+
+    return re.sub(r"\[ITEMS:([\d,\s]+)\]", _replace, text)
+
+
+def _find_person_label(query: str) -> str | None:
+    """Return the first known person label (or display name) found in the query."""
+    query_lower = query.lower()
+    for p in store.get_all_persons():
+        if p["label"] in query_lower or p["display_name"].lower() in query_lower:
+            return p["label"]
+    return None
 
 
 @tool
@@ -107,145 +130,85 @@ def get_wardrobe_catalog(
     return _format_items(items)
 
 
-_TOOLS = {
-    "get_person_profile": get_person_profile,
-    "search_wardrobe_items": search_wardrobe_items,
-    "get_wardrobe_catalog": get_wardrobe_catalog,
-}
+def run_agent(query: str, on_step: Callable[[dict], None] | None = None) -> str:
+    """Answer a wardrobe question by pre-loading the person's catalog and making
+    a single LLM call with all the data as context.
 
-
-def _parse_action(text: str) -> tuple[str, dict] | None:
-    """Extract the last Action / Action Input block from model output.
-
-    Returns (tool_name, args_dict) or None if no action is found.
+    The llama3.2-vision model does not reliably follow a ReAct tool-calling loop,
+    so we fetch the profile and full catalog programmatically, inject them as
+    context, and ask the model to select and tag items in one shot.
     """
-    pattern = re.compile(
-        r"Action:\s*(\w+)\s*\n"
-        r"Action Input:\s*(.*?)(?=\nObservation:|\nThought:|\nAction:|\Z)",
-        re.DOTALL,
+    person_label = _find_person_label(query)
+    if not person_label:
+        return (
+            "Please include a person's name in your question "
+            "(e.g., 'What should Garrett wear?')."
+        )
+
+    logger.info("agent_start | person=%s | query=%.150s", person_label, query)
+
+    # --- Load profile ---
+    person = store.get_person(person_label)
+    profile_parts = []
+    if person:
+        profile_parts.append(f"Name: {person['display_name']}")
+        if person["pose_description"]:
+            profile_parts.append(f"Appearance: {person['pose_description']}")
+    profile_text = "\n".join(profile_parts) if profile_parts else "No profile available."
+
+    if on_step:
+        on_step({"type": "step", "step_type": "action",
+                 "tool": "get_person_profile", "args": {"person_label": person_label}})
+        on_step({"type": "step", "step_type": "observation", "content": profile_text})
+
+    # --- Load full catalog ---
+    catalog_items = store.get_catalog(person_label)
+    catalog_text = _format_items(catalog_items)
+
+    logger.info("catalog_loaded | person=%s | items=%d", person_label, len(catalog_items))
+
+    if on_step:
+        on_step({"type": "step", "step_type": "action",
+                 "tool": "get_wardrobe_catalog", "args": {"person_label": person_label}})
+        display = catalog_text if len(catalog_text) <= 400 else catalog_text[:400] + "\n…"
+        on_step({"type": "step", "step_type": "observation", "content": display})
+
+    if not catalog_items:
+        logger.warning("no_catalog_items | person=%s", person_label)
+        return "No wardrobe items found for your request. Please try again with a more specific question."
+
+    valid_ids = {item["id"] for item in catalog_items}
+
+    # --- Single LLM call with catalog as context ---
+    context = (
+        f"Person profile:\n{profile_text}\n\n"
+        f"Wardrobe catalog:\n{catalog_text}"
     )
-    matches = list(pattern.finditer(text))
-    if not matches:
-        return None
-    m = matches[-1]
-    tool_name = m.group(1).strip()
-    raw = m.group(2).strip()
-    try:
-        args = json.loads(raw)
-    except (json.JSONDecodeError, ValueError):
-        args = {}
-    return tool_name, args
 
-
-def _collect_observed_ids(messages: list) -> set[int]:
-    """Return every item ID that actually appeared in a tool Observation message.
-
-    Only IDs present here were genuinely returned by the database — any others
-    in the Final Answer are hallucinated and must be rejected.
-    """
-    ids: set[int] = set()
-    for msg in messages:
-        content = getattr(msg, "content", "") or ""
-        if content.startswith("Observation:"):
-            for m in re.finditer(r"\bid:(\d+)\b", content):
-                ids.add(int(m.group(1)))
-    return ids
-
-
-def _filter_items_tag(text: str, valid_ids: set[int]) -> str:
-    """Remove any item IDs from [ITEMS:...] that were not returned by a tool.
-
-    If no valid IDs remain the tag is removed entirely so no OutfitCard is shown.
-    """
-    def _replace(m: re.Match) -> str:
-        kept = [i for i in m.group(1).split(",") if i.strip().isdigit() and int(i.strip()) in valid_ids]
-        return f"[ITEMS:{','.join(kept)}]" if kept else ""
-
-    return re.sub(r"\[ITEMS:([\d,\s]+)\]", _replace, text)
-
-
-_ITEM_TOOLS = {"get_wardrobe_catalog", "search_wardrobe_items"}
-
-
-def run_agent(query: str) -> str:
-    """Run the wardrobe ReAct sub-agent using a manual text-based loop.
-
-    llama3.2-vision does not support Ollama's native tools API, so we drive the
-    ReAct loop ourselves: parse Action/Action Input from the model's text,
-    call the tool, append an Observation message, and repeat until Final Answer.
-
-    Guards enforced before accepting a Final Answer:
-    1. At least one item-search tool (get_wardrobe_catalog / search_wardrobe_items)
-       must have been called — calling only get_person_profile is not enough.
-    2. If real item IDs were returned by a tool but the Final Answer contains no
-       valid [ITEMS:...] tag, the model is told the exact IDs it observed and asked
-       to revise so the UI OutfitCard can be rendered.
-    """
     llm = _get_llm()
-    messages: list = [
+    messages = [
         SystemMessage(content=_load_prompt()),
+        HumanMessage(content=context),
         HumanMessage(content=query),
     ]
-    item_lookup_done = False  # True once get_wardrobe_catalog or search_wardrobe_items runs
 
-    for _ in range(10):
-        response = llm.invoke(messages)
-        content = response.content
-        messages.append(AIMessage(content=content))
+    response = llm.invoke(messages)
+    answer = response.content.strip()
 
-        if "Final Answer:" in content:
-            if not item_lookup_done:
-                # Model answered without checking the wardrobe database
-                messages.append(HumanMessage(content=(
-                    "You must call get_wardrobe_catalog or search_wardrobe_items "
-                    "to retrieve actual items from the database before giving a "
-                    "Final Answer. Calling only get_person_profile is not sufficient. "
-                    "Please look up the wardrobe items now."
-                )))
-                continue
+    # Strip "Final Answer:" prefix if the model includes it
+    fa_match = re.search(r"Final Answer:\s*(.*)", answer, re.DOTALL)
+    if fa_match:
+        answer = fa_match.group(1).strip()
 
-            match = re.search(r"Final Answer:\s*(.*)", content, re.DOTALL)
-            answer = match.group(1).strip() if match else content
+    # Remove hallucinated IDs (any [ITEMS:...] IDs not in the catalog)
+    filtered = _filter_items_tag(answer, valid_ids)
 
-            # Strip any IDs the model invented — only trust what the tools returned
-            observed = _collect_observed_ids(messages)
-            filtered = _filter_items_tag(answer, observed)
-
-            # If real items were found but the tag is missing / was fully stripped,
-            # the model hallucinated its recommendation — force it to redo with real IDs
-            if observed and "[ITEMS:" not in filtered:
-                id_list = ",".join(str(i) for i in sorted(observed))
-                messages.append(HumanMessage(content=(
-                    f"Your Final Answer did not include a valid [ITEMS:...] tag, or "
-                    f"it referenced item IDs that were not in the tool Observations. "
-                    f"The only valid IDs from the database are: {id_list}. "
-                    f"Please revise your Final Answer to recommend from those items "
-                    f"only and end with [ITEMS:{id_list}] (or a subset)."
-                )))
-                continue
-
-            return filtered
-
-        call = _parse_action(content)
-        if call:
-            name, args = call
-            if name in _ITEM_TOOLS:
-                item_lookup_done = True
-            fn = _TOOLS.get(name)
-            if fn:
-                try:
-                    observation = fn.invoke(args)
-                except Exception as exc:
-                    observation = f"Tool error: {exc}"
-            else:
-                observation = f"Unknown tool: {name}"
-            messages.append(HumanMessage(content=f"Observation: {observation}"))
-        else:
-            # No action and no Final Answer — return whatever the model produced
-            # (no [ITEMS:...] filtering needed since no tools were called)
-            return content
-
-    return messages[-1].content if messages else "Unable to generate a recommendation."
+    logger.info(
+        "final_answer | person=%s | answer_preview=%.200s",
+        person_label,
+        filtered[:200].replace("\n", " "),
+    )
+    return filtered
 
 
 def register(mcp: FastMCP) -> None:
