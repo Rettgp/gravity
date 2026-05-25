@@ -32,7 +32,7 @@ export default function App() {
   return (
     <div className="h-screen bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
       <header className="flex items-center justify-between px-6 py-3 border-b border-slate-800 bg-slate-950/90 backdrop-blur-sm sticky top-0 z-10">
-        <img src="/logo.png" alt="Gravity" className="h-10 object-contain" />
+        <img src="/logo_simple.png" alt="Gravity" className="h-10 object-contain" />
         <Clock />
       </header>
 
