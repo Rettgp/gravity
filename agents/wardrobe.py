@@ -25,8 +25,10 @@ def _get_embedder():
 
 
 def _get_llm() -> ChatOllama:
-    # Vision model handles text reasoning too and supports future image-in-chat.
-    model = os.environ.get("OLLAMA_VISION_MODEL", os.environ["OLLAMA_MODEL"])
+    model = os.environ.get(
+        "OLLAMA_WARDROBE_MODEL",
+        os.environ.get("OLLAMA_MODEL", "qwen2.5:14b"),
+    )
     return ChatOllama(
         model=model,
         base_url=os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434"),
