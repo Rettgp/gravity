@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
-import { streamChat, type OutfitItem } from "../lib/streamChat";
+import { streamOutfit, type OutfitItem } from "../lib/streamChat";
 
 interface Props {
+  personLabel: string;
   weatherSummary: string | null;
 }
 
-export default function OutfitSection({ weatherSummary }: Props) {
+export default function OutfitSection({ personLabel, weatherSummary }: Props) {
   const [items, setItems] = useState<OutfitItem[]>([]);
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
@@ -28,12 +29,10 @@ export default function OutfitSection({ weatherSummary }: Props) {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
-    const query = `What should Garrett wear today? Today's weather: ${summary}. Please select a complete outfit appropriate for the conditions.`;
-
     try {
-      for await (const event of streamChat(query, [], ctrl.signal)) {
+      for await (const event of streamOutfit(personLabel, summary, ctrl.signal)) {
         if (event.type === "result") {
-          setAnswer(event.answer);
+          setAnswer(event.answer.replace(/\[ITEMS:[\d,\s]+\]/g, "").trim());
           setItems(event.outfit_items);
         }
       }

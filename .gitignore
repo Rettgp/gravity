@@ -18,5 +18,8 @@ ui/dist/
 # OS
 .DS_Store
 
+# Claude
+.claude
+
 # Gravity
 .gravity

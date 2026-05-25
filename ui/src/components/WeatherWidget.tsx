@@ -168,20 +168,25 @@ export default function WeatherWidget({ onLoaded }: Props) {
         </div>
       </div>
 
-      <div className="grid grid-cols-7 gap-2 lg:gap-3">
+      {/* Mobile: swipeable horizontal scroll. sm+: 7-col grid */}
+      <div className="overflow-x-auto no-scrollbar -mx-5 px-5 sm:overflow-x-visible sm:mx-0 sm:px-0">
+      <div className="flex sm:grid sm:grid-cols-7 gap-2 lg:gap-3 pb-1 sm:pb-0">
         {data.daily.map((day, i) => {
           const info = wmo(day.code);
+          const shortName = i === 0 ? "Today" : day.dayName.slice(0, 2);
           return (
             <div
               key={i}
-              className={`flex flex-col items-center gap-2 rounded-xl py-3 px-2 lg:py-4 lg:px-3 xl:py-5 xl:px-4 ${
+              className={`flex-shrink-0 sm:flex-shrink w-[72px] sm:w-auto flex flex-col items-center gap-2 rounded-xl py-3 px-2 lg:py-4 lg:px-3 xl:py-5 xl:px-4 ${
                 i === 0
                   ? "bg-sky-950/60 border border-sky-800/50"
                   : "bg-slate-800/50 border border-transparent"
               }`}
             >
-              <p className={`text-xs md:text-sm lg:text-base xl:text-lg font-semibold truncate w-full text-center ${i === 0 ? "text-sky-400" : "text-slate-400"}`}>
-                {day.dayName}
+              {/* Full name on sm+, 2-char abbreviation on mobile */}
+              <p className={`text-xs md:text-sm lg:text-base xl:text-lg font-semibold w-full text-center ${i === 0 ? "text-sky-400" : "text-slate-400"}`}>
+                <span className="hidden sm:inline">{day.dayName}</span>
+                <span className="sm:hidden">{shortName}</span>
               </p>
               <span className="text-xl md:text-2xl lg:text-3xl xl:text-4xl 2xl:text-5xl leading-none">{info.emoji}</span>
               <p className="text-sm md:text-base lg:text-xl xl:text-2xl 2xl:text-3xl font-bold text-slate-100">{day.high}°</p>
@@ -192,6 +197,7 @@ export default function WeatherWidget({ onLoaded }: Props) {
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );

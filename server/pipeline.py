@@ -48,7 +48,7 @@ def _extract_sources(messages: list) -> list[str]:
     return sources
 
 
-def _extract_item_ids(messages: list) -> list[int]:
+def extract_item_ids(messages: list) -> list[int]:
     """Parse [ITEMS:id1,id2,...] tags from all messages to collect recommended item IDs."""
     ids: list[int] = []
     seen: set[int] = set()
@@ -65,7 +65,7 @@ def _extract_item_ids(messages: list) -> list[int]:
     return ids
 
 
-def _build_outfit_items(item_ids: list[int]) -> list[dict]:
+def build_outfit_items(item_ids: list[int]) -> list[dict]:
     """Look up wardrobe items and build API-ready dicts with image URLs."""
     if not item_ids:
         return []
@@ -86,10 +86,15 @@ from langchain_core.tools import tool as _tool
 
 
 @_tool
-def wardrobe_assistant(query: str) -> str:
+def wardrobe_assistant(person_label: str, query: str) -> str:
     """Answer wardrobe and outfit questions using the person's clothing catalog.
-    Always include the person's name in the query."""
-    return _run_wardrobe_agent(query)
+
+    Args:
+        person_label: The person whose wardrobe to check (e.g. 'garrett').
+            Extract this from the user's message.
+        query: The outfit or wardrobe question.
+    """
+    return _run_wardrobe_agent(query, person_label=person_label)
 
 
 def _build_messages(state: dict) -> list:
@@ -131,8 +136,8 @@ class Pipeline:
                 answer = msg.content
                 break
         sources = _extract_sources(result["messages"])
-        item_ids = _extract_item_ids(result["messages"])
-        outfit_items = _build_outfit_items(item_ids)
+        item_ids = extract_item_ids(result["messages"])
+        outfit_items = build_outfit_items(item_ids)
         return {**state, "answer": answer, "sources": sources, "outfit_items": outfit_items}
 
     async def astream(self, state: dict) -> AsyncIterator[dict]:
@@ -154,16 +159,24 @@ class Pipeline:
                 messages = _build_messages(state)
 
                 @_tool
-                async def wardrobe_assistant_streaming(query: str) -> str:
+                async def wardrobe_assistant_streaming(person_label: str, query: str) -> str:
                     """Answer wardrobe and outfit questions using the person's clothing catalog.
-                    Always include the person's name in the query."""
+
+                    Args:
+                        person_label: The person whose wardrobe to check (e.g. 'garrett').
+                            Extract this from the user's message.
+                        query: The outfit or wardrobe question.
+                    """
                     logger.info(
-                        "supervisor_tool_call | tool=wardrobe_assistant | query=%.200s", query
+                        "supervisor_tool_call | tool=wardrobe_assistant | person=%s | query=%.200s",
+                        person_label, query,
                     )
                     # run_agent is blocking (calls llm.invoke in a loop) — run it in a
                     # thread so the event loop stays free to deliver step events in real-time
                     result = await asyncio.to_thread(
-                        _run_wardrobe_agent, query, on_step=on_wardrobe_step
+                        _run_wardrobe_agent, query,
+                        person_label=person_label,
+                        on_step=on_wardrobe_step,
                     )
                     logger.info(
                         "supervisor_tool_result | tool=wardrobe_assistant | chars=%d | preview=%.300s",
@@ -185,8 +198,8 @@ class Pipeline:
                         break
 
                 sources = _extract_sources(result["messages"])
-                item_ids = _extract_item_ids(result["messages"])
-                outfit_items = _build_outfit_items(item_ids)
+                item_ids = extract_item_ids(result["messages"])
+                outfit_items = build_outfit_items(item_ids)
 
                 logger.info(
                     "pipeline_result | outfit_items=%d | sources=%d | answer_preview=%.200s",

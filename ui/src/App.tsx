@@ -36,15 +36,15 @@ export default function App() {
         <Clock />
       </header>
 
-      <main className="flex-1 p-6 flex flex-col gap-5 overflow-hidden min-h-0">
+      <main className="flex-1 p-4 lg:p-6 flex flex-col gap-4 lg:gap-5 overflow-y-auto lg:overflow-hidden min-h-0">
         <WeatherWidget onLoaded={setWeatherSummary} />
 
-        <div className="flex gap-5 flex-1 min-h-0">
-          <div className="flex-1 min-w-0 overflow-y-auto">
-            <OutfitSection weatherSummary={weatherSummary} />
+        <div className="flex flex-col lg:flex-row lg:flex-1 lg:min-h-0 gap-4 lg:gap-5">
+          <div className="lg:flex-1 min-w-0 lg:overflow-y-auto">
+            <OutfitSection personLabel="garrett" weatherSummary={weatherSummary} />
           </div>
 
-          <div className="w-[380px] flex-shrink-0 flex flex-col">
+          <div className="w-full lg:w-[380px] flex-shrink-0 flex flex-col h-[420px] lg:h-auto">
             <Chat />
           </div>
         </div>

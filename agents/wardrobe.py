@@ -130,15 +130,27 @@ def get_wardrobe_catalog(
     return _format_items(items)
 
 
-def run_agent(query: str, on_step: Callable[[dict], None] | None = None) -> str:
+def run_agent(
+    query: str,
+    person_label: str | None = None,
+    on_step: Callable[[dict], None] | None = None,
+) -> str:
     """Answer a wardrobe question by pre-loading the person's catalog and making
     a single LLM call with all the data as context.
 
     The llama3.2-vision model does not reliably follow a ReAct tool-calling loop,
     so we fetch the profile and full catalog programmatically, inject them as
     context, and ask the model to select and tag items in one shot.
+
+    Args:
+        query: The natural-language outfit question.
+        person_label: Explicit person label (e.g. 'garrett').  When provided,
+            free-text name extraction is skipped entirely.  Callers that know
+            the person should always supply this.
+        on_step: Optional callback for streaming reasoning steps.
     """
-    person_label = _find_person_label(query)
+    if not person_label:
+        person_label = _find_person_label(query)
     if not person_label:
         return (
             "Please include a person's name in your question "

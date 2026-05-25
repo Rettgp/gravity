@@ -1,9 +1,94 @@
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+import asyncio
+import json
+import re
 
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse, StreamingResponse
+from pydantic import BaseModel
+
+from agents.wardrobe import run_agent
+from server.pipeline import build_outfit_items
 from source_wardrobe.store import get_catalog, get_items_by_ids
 
 router = APIRouter()
+
+
+class OutfitRequest(BaseModel):
+    person_label: str
+    weather_summary: str
+
+
+def _extract_ids_from_text(text: str) -> list[int]:
+    """Parse [ITEMS:id,...] tags out of a plain agent-response string."""
+    ids: list[int] = []
+    seen: set[int] = set()
+    for match in re.finditer(r"\[ITEMS:([\d,]+)\]", text):
+        for raw in match.group(1).split(","):
+            raw = raw.strip()
+            if raw.isdigit():
+                item_id = int(raw)
+                if item_id not in seen:
+                    seen.add(item_id)
+                    ids.append(item_id)
+    return ids
+
+
+@router.post("/outfit/stream")
+async def outfit_stream(req: OutfitRequest) -> StreamingResponse:
+    """SSE stream for dashboard outfit recommendations.
+
+    person_label is a typed field — the query is constructed here so the
+    person's name is guaranteed to be present, bypassing the chat supervisor.
+
+    Events match the chat stream format:
+    - ``{"type": "step", ...}``
+    - ``{"type": "result", "answer": "...", "sources": [], "outfit_items": [...]}``
+    - ``{"type": "error", "message": "..."}``
+    """
+    person_label = req.person_label.strip().lower()
+    query = (
+        f"What should {person_label} wear today? "
+        f"Today's weather: {req.weather_summary}."
+    )
+
+    async def generate():
+        loop = asyncio.get_running_loop()
+        queue: asyncio.Queue[dict] = asyncio.Queue()
+
+        def on_step(event: dict) -> None:
+            loop.call_soon_threadsafe(queue.put_nowait, event)
+
+        async def _run() -> None:
+            try:
+                result = await asyncio.to_thread(
+                    run_agent, query, person_label=person_label, on_step=on_step
+                )
+                outfit_items = build_outfit_items(_extract_ids_from_text(result))
+                loop.call_soon_threadsafe(queue.put_nowait, {
+                    "type": "result",
+                    "answer": result,
+                    "sources": [],
+                    "outfit_items": outfit_items,
+                })
+            except Exception as exc:
+                loop.call_soon_threadsafe(queue.put_nowait, {
+                    "type": "error",
+                    "message": str(exc),
+                })
+
+        task = asyncio.create_task(_run())
+        while True:
+            event = await queue.get()
+            yield f"data: {json.dumps(event)}\n\n"
+            if event["type"] in ("result", "error"):
+                break
+        await task
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/image/{item_id}")
