@@ -2,7 +2,17 @@
   "permissions": {
     "allow": [
       "PowerShell(Set-Location d:\\\\Projects\\\\gravity; $python = \"d:\\\\Projects\\\\gravity\\\\.venv\\\\Scripts\\\\python.exe\"; & $python -m pytest tests/agents/test_family_docs.py tests/server/test_pipeline.py -v 2>&1)",
-      "PowerShell(ollama pull llama3.1:8b-instruct-q4_K_M 2>&1)"
+      "PowerShell(ollama pull llama3.1:8b-instruct-q4_K_M 2>&1)",
+      "PowerShell(Get-ChildItem -Path \"D:\\\\Projects\\\\gravity\" -Force | Select-Object Name, @{Name=\"Type\";Expression={if \\($_.PSIsContainer\\) {\"Directory\"} else {\"File\"}}})",
+      "Bash(New-Item -ItemType Directory -Force \"D:\\\\Projects\\\\gravity\\\\ui\\\\public\")",
+      "Bash(Out-Null)",
+      "Bash(Copy-Item \"D:\\\\Projects\\\\gravity\\\\logo.png\" \"D:\\\\Projects\\\\gravity\\\\ui\\\\public\\\\logo.png\")",
+      "Bash(Write-Output \"Done\")",
+      "PowerShell(New-Item -ItemType Directory -Force \"D:\\\\Projects\\\\gravity\\\\ui\\\\public\")",
+      "PowerShell(Copy-Item \"D:\\\\Projects\\\\gravity\\\\logo.png\" \"D:\\\\Projects\\\\gravity\\\\ui\\\\public\\\\logo.png\")",
+      "Bash(New-Item -ItemType Directory -Force \"D:\\\\Projects\\\\gravity\\\\.claude\")",
+      "mcp__Claude_Preview__preview_start",
+      "mcp__Claude_in_Chrome__list_connected_browsers"
     ]
   }
 }
