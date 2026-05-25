@@ -116,11 +116,11 @@ export default function OutfitSection({ personLabel, weatherSummary }: Props) {
 
       {loading && (
         <div className="flex flex-col gap-4">
-          <div className="flex gap-3 flex-wrap">
+          <div className="flex gap-3 lg:gap-4 flex-wrap">
             {[...Array(5)].map((_, i) => (
               <div key={i} className="flex flex-col items-center gap-2">
-                <div className="w-24 h-24 rounded-xl bg-slate-800 animate-pulse" />
-                <div className="w-16 h-3 bg-slate-800 rounded animate-pulse" />
+                <div className="w-24 h-24 md:w-32 md:h-32 lg:w-40 lg:h-40 xl:w-48 xl:h-48 rounded-xl bg-slate-800 animate-pulse" />
+                <div className="w-16 md:w-20 lg:w-24 h-3 bg-slate-800 rounded animate-pulse" />
               </div>
             ))}
           </div>
@@ -130,7 +130,7 @@ export default function OutfitSection({ personLabel, weatherSummary }: Props) {
 
       {!loading && items.length > 0 && (
         <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 lg:gap-4">
             {items.map((item) => (
               <a
                 key={item.item_id}
@@ -139,7 +139,7 @@ export default function OutfitSection({ personLabel, weatherSummary }: Props) {
                 rel="noopener noreferrer"
                 className="flex flex-col items-center gap-1.5 group"
               >
-                <div className="w-24 h-24 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 group-hover:border-violet-500 transition-colors">
+                <div className="w-24 h-24 md:w-32 md:h-32 lg:w-40 lg:h-40 xl:w-48 xl:h-48 rounded-xl overflow-hidden bg-slate-800 border border-slate-700 group-hover:border-violet-500 transition-colors">
                   <img
                     src={item.image_url}
                     alt={item.label}
@@ -150,7 +150,7 @@ export default function OutfitSection({ personLabel, weatherSummary }: Props) {
                     }}
                   />
                 </div>
-                <span className="text-xs text-slate-400 text-center max-w-[6rem] leading-tight line-clamp-2 group-hover:text-slate-200 transition-colors">
+                <span className="text-xs md:text-sm lg:text-base text-slate-400 text-center max-w-[6rem] md:max-w-[8rem] lg:max-w-[10rem] leading-tight line-clamp-2 group-hover:text-slate-200 transition-colors">
                   {item.label}
                 </span>
               </a>
