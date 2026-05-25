@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import WeatherWidget from "./components/WeatherWidget";
 import OutfitSection from "./components/OutfitSection";
 import Chat from "./components/Chat";
+import CatalogEditor from "./components/CatalogEditor";
 
 function Clock() {
   const [now, setNow] = useState(new Date());
@@ -28,11 +29,22 @@ function Clock() {
 
 export default function App() {
   const [weatherSummary, setWeatherSummary] = useState<string | null>(null);
+  const [showEditor, setShowEditor] = useState(false);
 
   return (
     <div className="h-screen bg-slate-950 text-slate-100 flex flex-col overflow-hidden">
+      {showEditor && <CatalogEditor onClose={() => setShowEditor(false)} />}
       <header className="flex items-center justify-between px-6 py-3 border-b border-slate-800 bg-slate-950/90 backdrop-blur-sm sticky top-0 z-10">
-        <img src="/logo_simple.png" alt="Gravity" className="h-10 object-contain" />
+        <div className="flex items-center gap-3">
+          <img src="/logo_simple.png" alt="Gravity" className="h-10 object-contain" />
+          <button
+            onClick={() => setShowEditor(true)}
+            className="text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors text-xs px-2.5 py-1 rounded-md border border-slate-700"
+            title="Edit wardrobe catalog"
+          >
+            Edit Wardrobe Catalog
+          </button>
+        </div>
         <Clock />
       </header>
 

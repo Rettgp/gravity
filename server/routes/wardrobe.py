@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from agents.wardrobe import run_agent
 from server.pipeline import build_outfit_items
-from source_wardrobe.store import get_catalog, get_items_by_ids
+from source_wardrobe.store import get_all_persons, get_catalog, get_items_by_ids, update_item_fields
 
 router = APIRouter()
 
@@ -99,6 +99,26 @@ async def get_wardrobe_image(item_id: int) -> FileResponse:
         raise HTTPException(status_code=404, detail="Item not found")
     image_path = items[0]["image_path"]
     return FileResponse(image_path)
+
+
+@router.get("/persons")
+async def list_persons() -> dict:
+    """Return all people registered in the wardrobe."""
+    return {"persons": get_all_persons()}
+
+
+class ItemUpdateRequest(BaseModel):
+    description: str | None = None
+    colors: list[str] | None = None
+
+
+@router.patch("/items/{item_id}")
+async def update_item(item_id: int, req: ItemUpdateRequest) -> dict:
+    """Update description and/or colors for a wardrobe item."""
+    updated = update_item_fields(item_id, req.description, req.colors)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return {"ok": True}
 
 
 @router.get("/catalog/{person_label}")

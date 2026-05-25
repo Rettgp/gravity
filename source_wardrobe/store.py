@@ -248,6 +248,31 @@ def get_items_by_ids(item_ids: list[int]) -> list[dict]:
     return [{**_row_to_dict(r[:7]), "person_label": r[7]} for r in rows]
 
 
+def update_item_fields(
+    item_id: int,
+    description: str | None = None,
+    colors: list[str] | None = None,
+) -> bool:
+    sets = []
+    params: list = []
+    if description is not None:
+        sets.append("description = %s")
+        params.append(description)
+    if colors is not None:
+        sets.append("colors = %s")
+        params.append(colors)
+    if not sets:
+        return False
+    params.append(item_id)
+    with _connect() as conn:
+        result = conn.execute(
+            f"UPDATE wardrobe_items SET {', '.join(sets)} WHERE id = %s",
+            params,
+        )
+        conn.commit()
+    return result.rowcount > 0
+
+
 def clear_all_items() -> tuple[int, int]:
     """Delete all wardrobe_outfits and wardrobe_items rows. Returns (outfits_deleted, items_deleted)."""
     with _connect() as conn:
