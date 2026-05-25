@@ -248,6 +248,15 @@ def get_items_by_ids(item_ids: list[int]) -> list[dict]:
     return [{**_row_to_dict(r[:7]), "person_label": r[7]} for r in rows]
 
 
+def clear_all_items() -> tuple[int, int]:
+    """Delete all wardrobe_outfits and wardrobe_items rows. Returns (outfits_deleted, items_deleted)."""
+    with _connect() as conn:
+        outfits = conn.execute("DELETE FROM wardrobe_outfits RETURNING id").fetchall()
+        items = conn.execute("DELETE FROM wardrobe_items RETURNING id").fetchall()
+        conn.commit()
+    return len(outfits), len(items)
+
+
 def _row_to_dict(row) -> dict:
     return {
         "id": row[0],

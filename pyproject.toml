@@ -31,6 +31,7 @@ dependencies = [
 gravity-ingest           = "source_obsidian.ingest:main"
 gravity-wardrobe-ingest  = "source_wardrobe.ingest:main"
 gravity-wardrobe-pose    = "source_wardrobe.pose_ingest:main"
+gravity-wardrobe-clear   = "source_wardrobe.clear:main"
 gravity-agents           = "agents.server:main"
 gravity-server           = "server.main:start"
 
