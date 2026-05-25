@@ -8,7 +8,14 @@ from pydantic import BaseModel
 
 from agents.wardrobe import run_agent
 from server.pipeline import build_outfit_items
-from source_wardrobe.store import get_all_persons, get_catalog, get_items_by_ids, update_item_fields
+from source_wardrobe.store import (
+    get_all_persons,
+    get_catalog,
+    get_daily_pick,
+    get_items_by_ids,
+    update_item_fields,
+    upsert_daily_pick,
+)
 
 router = APIRouter()
 
@@ -99,6 +106,32 @@ async def get_wardrobe_image(item_id: int) -> FileResponse:
         raise HTTPException(status_code=404, detail="Item not found")
     image_path = items[0]["image_path"]
     return FileResponse(image_path)
+
+
+@router.get("/daily-pick/{person_label}")
+async def get_today_pick(person_label: str) -> dict:
+    """Return today's saved outfit pick, or 404 if none exists yet."""
+    pick = get_daily_pick(person_label.lower())
+    if not pick:
+        raise HTTPException(status_code=404, detail="No pick for today")
+    items = get_items_by_ids(pick["item_ids"])
+    outfit_items = [
+        {"item_id": item["id"], "label": item["description"], "image_url": f"/api/wardrobe/image/{item['id']}"}
+        for item in items
+    ]
+    return {"outfit_items": outfit_items, "answer": pick["answer"]}
+
+
+class DailyPickRequest(BaseModel):
+    item_ids: list[int]
+    answer: str
+
+
+@router.post("/daily-pick/{person_label}")
+async def save_today_pick(person_label: str, req: DailyPickRequest) -> dict:
+    """Persist (or overwrite) today's outfit pick for a person."""
+    upsert_daily_pick(person_label.lower(), req.item_ids, req.answer)
+    return {"ok": True}
 
 
 @router.get("/persons")

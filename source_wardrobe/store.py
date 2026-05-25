@@ -41,6 +41,18 @@ CREATE TABLE IF NOT EXISTS wardrobe_outfits (
 )
 """
 
+_CREATE_DAILY_PICKS = """
+CREATE TABLE IF NOT EXISTS wardrobe_daily_picks (
+    id           SERIAL PRIMARY KEY,
+    person_label TEXT NOT NULL REFERENCES wardrobe_persons(label),
+    date         DATE NOT NULL DEFAULT CURRENT_DATE,
+    item_ids     INT[] NOT NULL,
+    answer       TEXT NOT NULL DEFAULT '',
+    created_at   TIMESTAMP DEFAULT NOW(),
+    UNIQUE (person_label, date)
+)
+"""
+
 
 def _dsn() -> str:
     return (
@@ -67,6 +79,7 @@ def ensure_schema() -> None:
         conn.execute(_CREATE_PERSONS)
         conn.execute(_CREATE_ITEMS)
         conn.execute(_CREATE_OUTFITS)
+        conn.execute(_CREATE_DAILY_PICKS)
         conn.commit()
     conn.close()
 
@@ -246,6 +259,35 @@ def get_items_by_ids(item_ids: list[int]) -> list[dict]:
             (item_ids,),
         ).fetchall()
     return [{**_row_to_dict(r[:7]), "person_label": r[7]} for r in rows]
+
+
+def get_daily_pick(person_label: str) -> dict | None:
+    """Return today's saved outfit pick for a person, or None if none exists."""
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT item_ids, answer FROM wardrobe_daily_picks WHERE person_label = %s AND date = CURRENT_DATE",
+            (person_label,),
+        ).fetchone()
+    if not row:
+        return None
+    return {"item_ids": list(row[0]), "answer": row[1]}
+
+
+def upsert_daily_pick(person_label: str, item_ids: list[int], answer: str) -> None:
+    """Save (or overwrite) today's outfit pick for a person."""
+    with _connect() as conn:
+        conn.execute(
+            """
+            INSERT INTO wardrobe_daily_picks (person_label, item_ids, answer)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (person_label, date) DO UPDATE SET
+              item_ids   = EXCLUDED.item_ids,
+              answer     = EXCLUDED.answer,
+              created_at = NOW()
+            """,
+            (person_label, item_ids, answer),
+        )
+        conn.commit()
 
 
 def update_item_fields(

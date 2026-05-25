@@ -11,16 +11,36 @@ export default function OutfitSection({ personLabel, weatherSummary }: Props) {
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [fetched, setFetched] = useState(false);
+  const [forceNew, setForceNew] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!weatherSummary || fetched) return;
-    load(weatherSummary);
-  }, [weatherSummary, fetched]);
+    if (forceNew) {
+      setForceNew(false);
+      setFetched(true);
+      stream(weatherSummary);
+    } else {
+      loadOrFetch(weatherSummary);
+    }
+  }, [weatherSummary, fetched, forceNew]);
 
-  async function load(summary: string) {
-    if (loading) return;
+  async function loadOrFetch(summary: string) {
     setFetched(true);
+    try {
+      const res = await fetch(`/api/wardrobe/daily-pick/${personLabel}`);
+      if (res.ok) {
+        const data = await res.json();
+        setItems(data.outfit_items);
+        setAnswer(data.answer);
+        return;
+      }
+    } catch {}
+    await stream(summary);
+  }
+
+  async function stream(summary: string) {
+    if (loading) return;
     setLoading(true);
     setItems([]);
     setAnswer("");
@@ -32,8 +52,17 @@ export default function OutfitSection({ personLabel, weatherSummary }: Props) {
     try {
       for await (const event of streamOutfit(personLabel, summary, ctrl.signal)) {
         if (event.type === "result") {
-          setAnswer(event.answer.replace(/\[ITEMS:[\d,\s]+\]/g, "").trim());
+          const cleanAnswer = event.answer.replace(/\[ITEMS:[\d,\s]+\]/g, "").trim();
+          setAnswer(cleanAnswer);
           setItems(event.outfit_items);
+          await fetch(`/api/wardrobe/daily-pick/${personLabel}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              item_ids: event.outfit_items.map((i) => i.item_id),
+              answer: cleanAnswer,
+            }),
+          });
         }
       }
     } catch (err) {
@@ -46,6 +75,7 @@ export default function OutfitSection({ personLabel, weatherSummary }: Props) {
 
   function refresh() {
     if (!weatherSummary) return;
+    setForceNew(true);
     setFetched(false);
   }
 
