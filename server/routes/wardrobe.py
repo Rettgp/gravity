@@ -143,12 +143,13 @@ async def list_persons() -> dict:
 class ItemUpdateRequest(BaseModel):
     description: str | None = None
     colors: list[str] | None = None
+    category: str | None = None
 
 
 @router.patch("/items/{item_id}")
 async def update_item(item_id: int, req: ItemUpdateRequest) -> dict:
-    """Update description and/or colors for a wardrobe item."""
-    updated = update_item_fields(item_id, req.description, req.colors)
+    """Update description, colors, and/or category for a wardrobe item."""
+    updated = update_item_fields(item_id, req.description, req.colors, req.category)
     if not updated:
         raise HTTPException(status_code=404, detail="Item not found")
     return {"ok": True}

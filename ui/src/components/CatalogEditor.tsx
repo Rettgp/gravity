@@ -12,6 +12,7 @@ interface Item {
 interface EditState {
   description: string;
   colors: string;
+  category: string;
 }
 
 interface Props {
@@ -48,7 +49,7 @@ export default function CatalogEditor({ onClose }: Props) {
         setItems(fetched);
         const init: Record<number, EditState> = {};
         for (const item of fetched) {
-          init[item.id] = { description: item.description, colors: item.colors.join(", ") };
+          init[item.id] = { description: item.description, colors: item.colors.join(", "), category: item.category };
         }
         setEdits(init);
         setSaved({});
@@ -74,6 +75,7 @@ export default function CatalogEditor({ onClose }: Props) {
             .split(",")
             .map((c) => c.trim())
             .filter(Boolean),
+          category: edit.category,
         }),
       });
       if (res.ok) {
@@ -88,6 +90,7 @@ export default function CatalogEditor({ onClose }: Props) {
                     .split(",")
                     .map((c) => c.trim())
                     .filter(Boolean),
+                  category: edit.category,
                 }
               : item
           )
@@ -146,10 +149,11 @@ export default function CatalogEditor({ onClose }: Props) {
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {group.map((item) => {
-                const edit = edits[item.id] ?? { description: item.description, colors: item.colors.join(", ") };
+                const edit = edits[item.id] ?? { description: item.description, colors: item.colors.join(", "), category: item.category };
                 const isDirty =
                   edit.description !== item.description ||
-                  edit.colors !== item.colors.join(", ");
+                  edit.colors !== item.colors.join(", ") ||
+                  edit.category !== item.category;
                 return (
                   <div
                     key={item.id}
@@ -181,6 +185,19 @@ export default function CatalogEditor({ onClose }: Props) {
                           ))}
                         </div>
                       </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs text-slate-400">Category</label>
+                      <select
+                        value={edit.category}
+                        onChange={(e) => handleChange(item.id, "category", e.target.value)}
+                        className="bg-slate-800 border border-slate-700 rounded-md px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        {CATEGORY_ORDER.map((cat) => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
                     </div>
 
                     <div className="flex flex-col gap-1.5">

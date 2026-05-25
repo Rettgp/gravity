@@ -294,6 +294,7 @@ def update_item_fields(
     item_id: int,
     description: str | None = None,
     colors: list[str] | None = None,
+    category: str | None = None,
 ) -> bool:
     sets = []
     params: list = []
@@ -303,6 +304,9 @@ def update_item_fields(
     if colors is not None:
         sets.append("colors = %s")
         params.append(colors)
+    if category is not None:
+        sets.append("category = %s")
+        params.append(category)
     if not sets:
         return False
     params.append(item_id)
