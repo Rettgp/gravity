@@ -23,6 +23,12 @@ describe('infra: nobody but the family', () => {
     t.resourceCountIs('AWS::Cognito::UserPoolIdentityProvider', 1);
   });
 
+  it('maps Google email_verified so signed-in users carry a verified email', () => {
+    t.hasResourceProperties('AWS::Cognito::UserPoolIdentityProvider', {
+      AttributeMapping: Match.objectLike({ email: 'email', email_verified: 'email_verified' }),
+    });
+  });
+
   it('enforces the allowlist in both Cognito triggers', () => {
     t.hasResourceProperties('AWS::Cognito::UserPool', {
       LambdaConfig: { PreSignUp: Match.anyValue(), PreTokenGeneration: Match.anyValue() },

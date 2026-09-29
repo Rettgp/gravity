@@ -1,7 +1,9 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { AppNav } from './components/AppNav';
+import { ApiError } from './lib/api';
 import { useAuth } from './lib/auth';
+import { useMe } from './lib/me';
 import { Dashboard } from './pages/Dashboard';
 import { JournalPage } from './pages/JournalPage';
 import { Login } from './pages/Login';
