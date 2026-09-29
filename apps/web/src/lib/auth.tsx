@@ -114,7 +114,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const authHeaders = useCallback(async (): Promise<Record<string, string>> => {
     if (mgr.current) {
-      const u = await mgr.current.getUser();
+      let u = await mgr.current.getUser();
+      if (u?.expired) {
+        // Renew with the refresh token; if that fails the session is really over.
+        try {
+          u = await mgr.current.signinSilent();
+        } catch {
+          await mgr.current.removeUser();
+          return {};
+        }
+      }
       // The API Gateway JWT authorizer validates the ID token (it carries email + email_verified).
       return u?.id_token ? { authorization: 'Bearer ' + u.id_token } : {};
     }

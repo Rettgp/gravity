@@ -96,7 +96,12 @@ export class GravityStack extends Stack {
       clientId: props.googleClientId,
       clientSecretValue: SecretValue.unsafePlainText(props.googleClientSecret),
       scopes: ['openid', 'email', 'profile'],
-      attributeMapping: { email: ProviderAttribute.GOOGLE_EMAIL, fullname: ProviderAttribute.GOOGLE_NAME },
+      // email_verified must be mapped, or federated users are created unverified and the API (correctly) rejects them.
+      attributeMapping: {
+        email: ProviderAttribute.GOOGLE_EMAIL,
+        emailVerified: ProviderAttribute.other('email_verified'),
+        fullname: ProviderAttribute.GOOGLE_NAME,
+      },
     });
     const domainPrefix = 'gravity-' + this.account;
     const domain = pool.addDomain('Domain', { cognitoDomain: { domainPrefix } });

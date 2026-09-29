@@ -1,7 +1,9 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
 import { AppNav } from './components/AppNav';
+import { ApiError } from './lib/api';
 import { useAuth } from './lib/auth';
+import { useMe } from './lib/me';
 import { Dashboard } from './pages/Dashboard';
 import { JournalPage } from './pages/JournalPage';
 import { Login } from './pages/Login';
@@ -16,10 +18,37 @@ function AuthCallback() {
   return <Navigate to={status === 'authed' ? '/app' : '/'} replace />;
 }
 
+/** Shown when the API refuses us. Deliberately NOT an auto sign-out, which would loop forever. */
+function AccessProblem({ error, onRetry }: { error: Error; onRetry: () => void }) {
+  const { signOut, user } = useAuth();
+  const denied = error instanceof ApiError && (error.status === 401 || error.status === 403);
+  return (
+    <main className="login" role="alert">
+      <div className="card login-card">
+        <h1>{denied ? 'We could not confirm your access' : 'Something went wrong'}</h1>
+        <p className="muted">
+          {denied
+            ? (user?.email ?? 'This account') + ' is signed in, but Gravity did not accept it. Ask the family admin to check the allowlist, then try again.'
+            : 'We could not reach the server.'}
+        </p>
+        <p className="muted crash-detail">{error.message}</p>
+        <button className="btn" onClick={onRetry}>
+          Try again
+        </button>
+        <button className="btn btn-ghost" onClick={() => void signOut()}>
+          Sign out
+        </button>
+      </div>
+    </main>
+  );
+}
+
 function Protected() {
   const { status } = useAuth();
+  const me = useMe();
   if (status === 'loading') return <div className="splash" aria-busy="true" />;
   if (status === 'anon') return <Navigate to="/" replace />;
+  if (me.isError) return <AccessProblem error={me.error} onRetry={() => void me.refetch()} />;
   return (
     <div className="app-shell">
       <AppNav />
