@@ -126,7 +126,9 @@ export function Landing() {
         </motion.article>
       </section>
 
-      <footer className="land-foot muted">Gravity &middot; a private family dashboard</footer>
+      <footer className="land-foot muted">
+        Gravity &middot; a private family dashboard &middot; <a href="/privacy.html">Privacy policy</a>
+      </footer>
     </div>
   );
 }
