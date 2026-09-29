@@ -1,0 +1,13 @@
+node_modules/
+dist/
+cdk.out/
+*.tsbuildinfo
+.env.local
+.claude/settings.local.json
+.DS_Store
+.gravity-local/
+
+e2e-artifacts/
+test-results/
+playwright-report/
+infra/empty-site/
