@@ -2,10 +2,17 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "gravity-ui",
+      "name": "gravity-api",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
-      "cwd": "D:\\Projects\\gravity\\ui",
+      "runtimeArgs": ["run", "local:api"],
+      "cwd": "D:/Projects/gravity",
+      "port": 8787
+    },
+    {
+      "name": "gravity-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "local:web"],
+      "cwd": "D:/Projects/gravity",
       "port": 5174
     }
   ]

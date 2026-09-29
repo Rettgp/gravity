@@ -1,0 +1,1 @@
+{ "app": "npx tsx bin/gravity.ts", "context": { "@aws-cdk/core:newStyleStackSynthesis": true } }

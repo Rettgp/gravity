@@ -1,0 +1,95 @@
+/* Brand: #2c95c8 primary, violet + cyan from the logo gradient. Semantic tokens switch per theme. */
+:root {
+  --p-50: #eef8fc;
+  --p-100: #d6eef8;
+  --p-200: #b0def1;
+  --p-300: #7cc7e6;
+  --p-400: #48acd6;
+  --p-500: #2c95c8;
+  --p-600: #1f78a8;
+  --p-700: #1c6188;
+  --p-800: #1c5170;
+  --p-900: #1b445e;
+  --p-950: #122c3f;
+  --violet: #7c5cf0;
+  --cyan: #3cc8e6;
+  --coral: #f0605d;
+  --green: #2fb67c;
+  --amber: #f5a524;
+  --brand-gradient: linear-gradient(135deg, #3cc8e6, #2c95c8 45%, #7c5cf0);
+
+  --font-display: 'Sora Variable', 'Inter Variable', system-ui, sans-serif;
+  --font-ui: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* light */
+  --bg: #f6f9fc;
+  --bg-tint: #d6eef8;
+  --surface: #ffffff;
+  --surface-2: #eef3f8;
+  --border: #dbe4ee;
+  --text: #0e1a24;
+  --muted: #566677;
+  --accent: var(--p-600);
+  --accent-fill: var(--p-600);
+  --on-accent: #ffffff;
+  --link: var(--p-600);
+  --unwell: #d6403d;
+  --unwell-bg: color-mix(in oklab, var(--coral) 18%, var(--surface));
+  --well: #1f9a67;
+  --glass-border: rgba(14, 26, 36, 0.10);
+  --glass-highlight: rgba(255, 255, 255, 0.9);
+  --dot: rgba(14, 26, 36, 0.09);
+  --hero-glow: color-mix(in oklab, var(--p-500) 22%, transparent);
+  --hero-glow-2: color-mix(in oklab, var(--violet) 16%, transparent);
+  --shadow-none: none;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: #070b14;
+  --bg-tint: #0d1730;
+  --surface: #0f1626;
+  --surface-2: #161f33;
+  --border: #243049;
+  --text: #e7eef6;
+  --muted: #93a3b8;
+  --accent: var(--p-400);
+  --accent-fill: var(--p-500);
+  --on-accent: #04121b;
+  --link: var(--p-400);
+  --unwell: #ff7b78;
+  --unwell-bg: color-mix(in oklab, var(--coral) 24%, var(--surface));
+  --well: #46d19a;
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-highlight: rgba(255, 255, 255, 0.15);
+  --dot: rgba(255, 255, 255, 0.08);
+  --hero-glow: color-mix(in oklab, var(--p-500) 32%, transparent);
+  --hero-glow-2: color-mix(in oklab, var(--violet) 30%, transparent);
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #070b14;
+    --bg-tint: #0d1730;
+    --surface: #0f1626;
+    --surface-2: #161f33;
+    --border: #243049;
+    --text: #e7eef6;
+    --muted: #93a3b8;
+    --accent: var(--p-400);
+    --accent-fill: var(--p-500);
+    --on-accent: #04121b;
+    --link: var(--p-400);
+    --unwell: #ff7b78;
+    --unwell-bg: color-mix(in oklab, var(--coral) 24%, var(--surface));
+    --well: #46d19a;
+    --glass-border: rgba(255, 255, 255, 0.12);
+    --glass-highlight: rgba(255, 255, 255, 0.15);
+    --dot: rgba(255, 255, 255, 0.08);
+    --hero-glow: color-mix(in oklab, var(--p-500) 32%, transparent);
+    --hero-glow-2: color-mix(in oklab, var(--violet) 30%, transparent);
+    color-scheme: dark;
+  }
+}
