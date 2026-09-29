@@ -85,3 +85,15 @@ a.tile:hover { transform: translateY(-2px); border-color: var(--accent); }
 .login-card { width: min(420px, 100%); display: grid; gap: 12px; justify-items: center; text-align: center; }
 .login-list { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 8px; width: 100%; }
 .login-list .btn { width: 100%; }
+
+/* Confirm dialog (in-app replacement for window.confirm) */
+.cd-root { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 20px; }
+.cd-scrim { position: absolute; inset: 0; background: rgba(4, 8, 16, 0.6); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); }
+.cd { position: relative; width: min(440px, 100%); display: grid; gap: 10px; justify-items: start; padding: 24px; border-radius: 28px; background: color-mix(in oklab, var(--surface) 88%, transparent); }
+.cd h2 { font-size: 20px; }
+.cd-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: color-mix(in oklab, var(--accent-fill) 20%, transparent); color: var(--accent); }
+.cd-icon.danger { background: var(--unwell-bg); color: var(--unwell); }
+.cd-error { font-size: 14px; }
+.cd-actions { display: flex; gap: 10px; justify-content: flex-end; width: 100%; margin-top: 8px; }
+.cd-actions .btn { flex: 1; white-space: nowrap; padding: 0 12px; }
+.crash-detail { font-size: 12px; word-break: break-word; }

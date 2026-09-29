@@ -96,3 +96,26 @@
 .jr-inline .jr-scrim { display: none; }
 .jr-inline .jr-sheet { position: static; inset: auto; width: auto; max-height: 560px; border-radius: 24px; }
 .jr-sheet-empty { display: grid; place-items: center; min-height: 240px; }
+
+/* Food list + searchable combobox (replaces the old pill chips) */
+.jr-foodlist { list-style: none; margin: 0; padding: 0; display: grid; border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
+.jr-food { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 6px 0 14px; background: var(--surface-2); }
+.jr-food + .jr-food { border-top: 1px solid var(--border); }
+.jr-x { width: 36px; height: 36px; }
+.jr-combo { position: relative; }
+.jr-combo .input { padding-right: 14px; }
+.jr-list {
+  position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 6px); margin: 0; padding: 6px; list-style: none;
+  max-height: 260px; overflow: auto; border-radius: 16px; background: var(--surface); border: 1px solid var(--accent);
+}
+.jr-opt { display: flex; align-items: center; min-height: 44px; padding: 0 12px; border-radius: 12px; cursor: pointer; text-transform: none; }
+.jr-opt-text { text-transform: capitalize; }
+.jr-opt.active { background: color-mix(in oklab, var(--accent-fill) 22%, var(--surface)); }
+.jr-opt.new { color: var(--accent); }
+.jr-opt.new strong { margin-left: 4px; color: var(--text); }
+.jr-food-text { flex: 1; text-align: left; min-height: 44px; background: none; border: 0; padding: 0; color: inherit; cursor: text; }
+.jr-food-text:hover { text-decoration: underline dotted; text-underline-offset: 4px; }
+.jr-food-edit { flex: 1; min-height: 36px; margin: 4px 0; padding: 0 10px; border-radius: 10px; border: 1px solid var(--accent); background: var(--surface); }
+.jr-opt { justify-content: space-between; gap: 8px; }
+.jr-opt-forget { display: grid; place-items: center; width: 36px; height: 36px; margin-right: -6px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); }
+.jr-opt-forget:hover, .jr-opt-forget:focus-visible { color: var(--unwell); background: var(--unwell-bg); }

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
 import type { MealKey } from '@gravity/shared';
+import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Icon } from '../../components/Icon';
 import { dayLabel } from '../../lib/dates';
 import { useJournalApi } from './api';
@@ -22,6 +23,8 @@ export function DaySheet({ pid, date, readOnly, ownerName, onClose }: Props) {
   const { draft, change, status, error } = useDayDraft(pid, date, readOnly);
   const foods = useQuery({ queryKey: ['journal', 'foods', pid], queryFn: () => api.foods(pid), enabled: !readOnly });
   const closeRef = useRef<HTMLButtonElement>(null);
+  const qc = useQueryClient();
+  const [forgetting, setForgetting] = useState<string | null>(null);
 
   useEffect(() => {
     closeRef.current?.focus({ preventScroll: true });
@@ -30,12 +33,19 @@ export function DaySheet({ pid, date, readOnly, ownerName, onClose }: Props) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const suggestions = useMemo(() => foods.data?.slice(0, 12).map((f) => f.food) ?? [], [foods.data]);
+  const suggestions = useMemo(() => foods.data?.map((f) => f.food) ?? [], [foods.data]);
   const addFood = (k: MealKey, text: string) => {
     const t = text.trim();
     if (t) change((d) => ({ ...d, meals: { ...d.meals, [k]: [...d.meals[k], { text: t }] } }));
   };
   const removeFood = (k: MealKey, i: number) => change((d) => ({ ...d, meals: { ...d.meals, [k]: d.meals[k].filter((_, j) => j !== i) } }));
+  const editFood = (k: MealKey, i: number, text: string) =>
+    change((d) => ({ ...d, meals: { ...d.meals, [k]: text ? d.meals[k].map((f, j) => (j === i ? { ...f, text } : f)) : d.meals[k].filter((_, j) => j !== i) } }));
+  const forgetFood = async (food: string) => {
+    await api.removeFood(pid, food);
+    await qc.invalidateQueries({ queryKey: ['journal'] });
+    setForgetting(null);
+  };
   const toggleSymptom = (n: string) =>
     change((d) => {
       const has = d.symptoms.some((s) => s.name.toLowerCase() === n.toLowerCase());
@@ -84,7 +94,7 @@ export function DaySheet({ pid, date, readOnly, ownerName, onClose }: Props) {
               <button className="switch" role="switch" aria-checked={draft.unwell} aria-labelledby="unwell-label" disabled={readOnly} onClick={() => change((d) => ({ ...d, unwell: !d.unwell }))} />
             </div>
             {draft.unwell && <Symptoms symptoms={draft.symptoms} readOnly={readOnly} onToggle={toggleSymptom} onSeverity={setSeverity} />}
-            <Meals meals={draft.meals} suggestions={suggestions} readOnly={readOnly} onAdd={addFood} onRemove={removeFood} />
+            <Meals meals={draft.meals} suggestions={suggestions} readOnly={readOnly} onAdd={addFood} onRemove={removeFood} onEdit={editFood} onForget={setForgetting} />
             <section className="jr-block">
               <label className="field">
                 Notes
@@ -104,6 +114,16 @@ export function DaySheet({ pid, date, readOnly, ownerName, onClose }: Props) {
           </div>
         )}
       </motion.aside>
+      {forgetting && (
+        <ConfirmDialog
+          danger
+          title={'Remove “' + forgetting + '” everywhere?'}
+          message="This removes it from every day you have logged and from your suggestions. It cannot be undone."
+          confirmLabel="Remove everywhere"
+          onConfirm={() => forgetFood(forgetting)}
+          onCancel={() => setForgetting(null)}
+        />
+      )}
     </>
   );
 }

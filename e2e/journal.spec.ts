@@ -18,10 +18,10 @@ test.describe('journal', () => {
     const sheet = page.getByRole('dialog');
     await expect(sheet).toBeVisible();
 
-    await sheet.getByRole('textbox', { name: 'Add food to Breakfast' }).fill('Scrambled eggs');
-    await sheet.getByRole('textbox', { name: 'Add food to Breakfast' }).press('Enter');
-    await sheet.getByRole('textbox', { name: 'Add food to Dinner' }).fill('Pizza');
-    await sheet.getByRole('textbox', { name: 'Add food to Dinner' }).press('Enter');
+    await sheet.getByRole('combobox', { name: 'Add food to Breakfast' }).fill('Scrambled eggs');
+    await sheet.getByRole('combobox', { name: 'Add food to Breakfast' }).press('Enter');
+    await sheet.getByRole('combobox', { name: 'Add food to Dinner' }).fill('Pizza');
+    await sheet.getByRole('combobox', { name: 'Add food to Dinner' }).press('Enter');
     await expect(sheet.locator('.jr-food', { hasText: 'Scrambled eggs' })).toBeVisible();
 
     await sheet.getByRole('switch', { name: 'Felt unwell today' }).click();
@@ -107,7 +107,7 @@ test.describe('journal', () => {
     const ro = teen.getByRole('dialog');
     await expect(ro).toContainText('view only');
     await expect(ro.getByRole('switch', { name: 'Felt unwell today' })).toBeDisabled();
-    await expect(ro.getByRole('textbox', { name: 'Add food to Dinner' })).toHaveCount(0);
+    await expect(ro.getByRole('combobox', { name: 'Add food to Dinner' })).toHaveCount(0);
     await teen.screenshot({ path: ART + '/shared-readonly-' + info.project.name + '.png' });
     await ctx.close();
 
@@ -131,13 +131,165 @@ test.describe('journal', () => {
     await page.getByRole('button', { name: /Junior/ }).click();
     await cell(page, today).click();
     const sheet = page.getByRole('dialog');
-    await sheet.getByRole('textbox', { name: 'Add food to Lunch' }).fill('Grilled cheese');
-    await sheet.getByRole('textbox', { name: 'Add food to Lunch' }).press('Enter');
+    await sheet.getByRole('combobox', { name: 'Add food to Lunch' }).fill('Grilled cheese');
+    await sheet.getByRole('combobox', { name: 'Add food to Lunch' }).press('Enter');
     await saved(page);
 
     const profiles = await (await request.get('/api/core/profiles', { headers: { 'x-dev-user': 'mom@gravity.local' } })).json();
     const junior = profiles.find((p: { name: string }) => p.name === 'Junior');
     const res = await request.get('/api/journal/profiles/' + junior.id + '/days/' + today, { headers: { 'x-dev-user': 'teen@gravity.local' } });
     expect(res.status()).toBe(404);
+  });
+});
+
+test.describe('food autocomplete', () => {
+  test('search history, pick with the keyboard, add a new food, Escape only closes the list', async ({ page, request }, info) => {
+    test.skip(info.project.name !== 'desktop', 'desktop only');
+    const dad = { 'x-dev-user': 'dad@gravity.local' };
+    await request.get('/api/core/me', { headers: dad });
+    expect((await request.post('/api/dev/seed', { headers: dad })).status()).toBe(200);
+    await signIn(page, 'dad');
+    await page.goto('/app/journal?date=' + addDays(today, -2));
+    const sheet = page.getByRole('dialog');
+    const lunch = sheet.getByRole('combobox', { name: 'Add food to Lunch' });
+
+    // Focus shows history; typing filters it.
+    await lunch.click();
+    await expect(sheet.getByRole('listbox', { name: /Lunch suggestions/ })).toBeVisible();
+    await lunch.fill('pi');
+    const pizza = sheet.getByRole('option', { name: /^pizza$/i });
+    await expect(pizza).toBeVisible();
+    await expect(sheet.getByRole('option', { name: /Add .pi./ })).toBeVisible(); // can also add exactly what was typed
+    // The list must be fully visible, not clipped below the fold of the sheet.
+    const box = await sheet.getByRole('listbox').boundingBox();
+    expect(box!.y + box!.height).toBeLessThanOrEqual(page.viewportSize()!.height + 1);
+    await page.screenshot({ path: ART + '/autocomplete-open-' + info.project.name + '.png' });
+
+    // Keyboard: ArrowDown highlights, Enter adds; input clears and the food is a list row, not a pill.
+    await lunch.press('ArrowDown');
+    await expect(pizza).toHaveAttribute('aria-selected', 'true');
+    await lunch.press('Enter');
+    const lunchSection = sheet.getByRole('region', { name: 'Lunch' });
+    await expect(lunchSection.locator('.jr-food', { hasText: 'pizza' })).toBeVisible();
+    await expect(lunch).toHaveValue('');
+
+    // Already-added foods are not offered again in the same meal.
+    await lunch.fill('pizza');
+    await expect(sheet.getByRole('option', { name: /^pizza$/i })).toHaveCount(0);
+
+    // A brand-new food can be added from the list.
+    await lunch.fill('dragonfruit smoothie');
+    await sheet.getByRole('option', { name: /Add .dragonfruit smoothie./ }).click();
+    await expect(lunchSection.locator('.jr-food', { hasText: 'dragonfruit smoothie' })).toBeVisible();
+    await saved(page);
+
+    // Escape closes the open list first; the day sheet stays.
+    await lunch.click();
+    await lunch.fill('o');
+    await expect(sheet.getByRole('listbox')).toBeVisible();
+    await lunch.press('Escape');
+    await expect(sheet.getByRole('listbox')).toHaveCount(0);
+    await expect(sheet).toBeVisible();
+
+    // Newly added food now appears in history for other meals.
+    await sheet.getByRole('combobox', { name: 'Add food to Snacks' }).fill('dragon');
+    await expect(sheet.getByRole('option', { name: /^dragonfruit smoothie$/i })).toBeVisible();
+    await page.screenshot({ path: ART + '/autocomplete-history-' + info.project.name + '.png' });
+  });
+});
+
+test.describe('fixing typos', () => {
+  test('edit a food in place, and remove a typo from history everywhere', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'desktop only');
+    const d1 = addDays(today, -8);
+    const d2 = addDays(today, -9);
+    await signIn(page, 'mom');
+    const add = async (date: string, food: string) => {
+      await page.goto('/app/journal?date=' + date);
+      const sheet = page.getByRole('dialog');
+      await sheet.getByRole('combobox', { name: 'Add food to Breakfast' }).fill(food);
+      await sheet.getByRole('combobox', { name: 'Add food to Breakfast' }).press('Enter');
+      await saved(page);
+    };
+    await add(d1, 'Bannana');
+    await add(d2, 'Bannana');
+
+    // 1) Fix the text in place on one day.
+    await page.goto('/app/journal?date=' + d1);
+    const sheet = page.getByRole('dialog');
+    const breakfast = sheet.getByRole('region', { name: 'Breakfast' });
+    await breakfast.getByRole('button', { name: 'Edit Bannana' }).click();
+    const edit = breakfast.getByRole('textbox', { name: 'Edit Bannana' });
+    await edit.fill('Banana');
+    await edit.press('Enter');
+    await expect(breakfast.locator('.jr-food', { hasText: 'Banana' })).toBeVisible();
+    await saved(page);
+    await page.reload();
+    await expect(page.getByRole('dialog').getByRole('region', { name: 'Breakfast' }).locator('.jr-food')).toHaveText('Banana');
+
+    // 2) The typo still lives on the other day and in suggestions: remove it from history everywhere.
+    await page.goto('/app/journal?date=' + d2);
+    const s2 = page.getByRole('dialog');
+    await expect(s2.getByRole('region', { name: 'Breakfast' }).locator('.jr-food', { hasText: 'Bannana' })).toBeVisible();
+    const lunch = s2.getByRole('combobox', { name: 'Add food to Lunch' });
+    await lunch.fill('bann');
+    await expect(s2.getByRole('option', { name: /bannana/i })).toBeVisible();
+    await expect(s2.getByRole('option', { name: /^banana$/i })).toHaveCount(0); // 'bann' does not match the corrected spelling
+    page.on('dialog', () => {
+      throw new Error('a native browser dialog appeared; use the in-app ConfirmDialog');
+    });
+    await s2.getByRole('button', { name: 'Remove bannana from history' }).click();
+    const confirm = page.getByRole('alertdialog');
+    await expect(confirm).toContainText('Remove “bannana” everywhere?');
+    await page.screenshot({ path: ART + '/confirm-dialog-' + info.project.name + '.png' });
+    await confirm.getByRole('button', { name: 'Remove everywhere' }).click();
+    await expect(confirm).toBeHidden();
+    await expect(s2.getByRole('region', { name: 'Breakfast' }).locator('.jr-food', { hasText: 'Bannana' })).toHaveCount(0);
+    await lunch.fill('bann');
+    await expect(s2.getByRole('option', { name: /bannana/i })).toHaveCount(0);
+    await page.screenshot({ path: ART + '/typo-fixed-' + info.project.name + '.png' });
+  });
+});
+
+test.describe('confirm dialog', () => {
+  const setup = async (page: import('@playwright/test').Page, date: string) => {
+    await signIn(page, 'mom');
+    await page.goto('/app/journal?date=' + date);
+    const sheet = page.getByRole('dialog');
+    const box = sheet.getByRole('combobox', { name: 'Add food to Breakfast' });
+    await box.fill('Kiwii');
+    await box.press('Enter');
+    await saved(page);
+    await sheet.getByRole('combobox', { name: 'Add food to Lunch' }).fill('kiw');
+    await sheet.getByRole('button', { name: 'Remove kiwii from history' }).click();
+    return sheet;
+  };
+
+  test('Cancel and Esc keep everything; Esc only closes the dialog, not the sheet', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'desktop only');
+    const sheet = await setup(page, addDays(today, -10));
+    const dlg = page.getByRole('alertdialog');
+    await expect(dlg.getByRole('button', { name: 'Cancel' })).toBeFocused(); // safe default focus
+    await page.keyboard.press('Escape');
+    await expect(dlg).toBeHidden();
+    await expect(sheet).toBeVisible();
+    await expect(sheet.getByRole('region', { name: 'Breakfast' }).locator('.jr-food', { hasText: 'Kiwii' })).toBeVisible();
+    await sheet.getByRole('combobox', { name: 'Add food to Lunch' }).fill('kiw');
+    await sheet.getByRole('button', { name: 'Remove kiwii from history' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('alertdialog')).toBeHidden();
+    await expect(sheet.getByRole('region', { name: 'Breakfast' }).locator('.jr-food', { hasText: 'Kiwii' })).toBeVisible();
+  });
+
+  test('a failing request shows an error inside the dialog instead of failing silently', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'desktop only');
+    await page.route('**/foods/remove', (r) => r.fulfill({ status: 500, contentType: 'application/json', body: '{"error":"Server hiccup"}' }));
+    await setup(page, addDays(today, -11));
+    const dlg = page.getByRole('alertdialog');
+    await dlg.getByRole('button', { name: 'Remove everywhere' }).click();
+    await expect(dlg.getByRole('alert')).toContainText('Server hiccup');
+    await expect(dlg.getByRole('button', { name: 'Remove everywhere' })).toBeEnabled(); // can retry
+    await page.screenshot({ path: ART + '/confirm-dialog-error.png' });
+    await dlg.getByRole('button', { name: 'Cancel' }).click();
   });
 });
