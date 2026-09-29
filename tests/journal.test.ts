@@ -101,4 +101,38 @@ describe('journal foods + insights', () => {
     expect(ins.unwellDays).toBe(2);
     expect(ins.suspects[0].food).toBe('rice');
   });
+
+  it('forgets a mistyped food across every day, only for managers', async () => {
+    await put('mom', momPid, '2026-09-01', day({ meals: meal('Pizzaa') }));
+    await put('mom', momPid, '2026-09-02', day({ meals: { ...meal('Rice'), lunch: [{ text: 'pizzaa ' }] } }));
+    await put('mom', momPid, '2026-09-03', day({ meals: meal('Oats') }));
+    const url = '/profiles/' + momPid + '/foods/remove';
+    expect((await app.journal('dad', 'POST', url, { food: 'pizzaa' })).status).toBe(404);
+    const res = await app.journal('mom', 'POST', url, { food: 'PIZZAA' });
+    expect(res.body).toEqual({ daysChanged: 2 });
+    const foods = (await app.journal('mom', 'GET', '/profiles/' + momPid + '/foods')).body as any[];
+    expect(foods.map((f) => f.food).sort()).toEqual(['oats', 'rice']);
+    expect(((await get('mom', momPid, '2026-09-02')).body as any).meals.breakfast[0].text).toBe('Rice');
+    expect((await app.journal('mom', 'POST', url, { food: '' })).status).toBe(400);
+  });
+
+  it('removal is permanent and never errors, even when the food is on no day', async () => {
+    const url = '/profiles/' + momPid + '/foods/remove';
+    // Not on any day: still succeeds (idempotent) and is remembered as hidden.
+    expect((await app.journal('mom', 'POST', url, { food: 'Ghost Pepper' })).body).toEqual({ daysChanged: 0 });
+    expect((await app.journal('mom', 'POST', url, { food: 'ghost pepper' })).status).toBe(200);
+    // Foods that only live in a day the person can no longer see also stay out after a later removal.
+    await put('mom', momPid, '2026-01-05', day({ meals: meal('Bannana') }));
+    await app.journal('mom', 'POST', '/profiles/' + momPid + '/foods/remove', { food: 'bannana' });
+    let foods = (await app.journal('mom', 'GET', '/profiles/' + momPid + '/foods')).body as any[];
+    expect(foods.map((f) => f.food)).not.toContain('bannana');
+    // Logging it again on purpose brings it back.
+    await put('mom', momPid, '2026-01-06', day({ meals: meal('Bannana') }));
+    foods = (await app.journal('mom', 'GET', '/profiles/' + momPid + '/foods')).body as any[];
+    expect(foods.map((f) => f.food)).toContain('bannana');
+    // Hidden markers are per profile.
+    await app.journal('mom', 'POST', url, { food: 'bannana' });
+    await put('mom', kidPid, '2026-01-06', day({ meals: meal('Bannana') }));
+    expect(((await app.journal('mom', 'GET', '/profiles/' + kidPid + '/foods')).body as any[]).map((f) => f.food)).toContain('bannana');
+  });
 });

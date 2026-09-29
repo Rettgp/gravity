@@ -62,3 +62,16 @@ test('appearance: System follows the device live, explicit choices override it, 
   await page.getByRole('button', { name: 'Sign out', exact: true }).click();
   await expect(page).toHaveURL(/\/$/);
 });
+
+// Regression: after Google sign-in the app lands on /auth/callback. It used to stay on that placeholder (a blank
+// dark screen) because the URL was rewritten behind the router's back. It must always hand off to /app or /.
+test('the auth callback route never leaves a blank screen', async ({ page }, info) => {
+  await page.goto('/auth/callback');
+  await expect(page).toHaveURL(/\/$/); // anonymous: back to the landing page
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+
+  await signIn(page, info.project.name === 'mobile' ? 'teen' : 'dad');
+  await page.goto('/auth/callback?code=abc&state=xyz');
+  await expect(page).toHaveURL(/\/app$/); // signed in: on to the dashboard, code removed from the URL
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+});

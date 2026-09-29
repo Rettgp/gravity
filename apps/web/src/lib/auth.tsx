@@ -22,6 +22,9 @@ interface AuthCtx {
 const Ctx = createContext<AuthCtx | null>(null);
 const DEV_KEY = 'gravity.devuser';
 
+/** The authorization code can only be exchanged once, so share one in-flight exchange (StrictMode runs effects twice). */
+let callbackExchange: ReturnType<UserManager['signinRedirectCallback']> | undefined;
+
 function makeManager(c: NonNullable<AppConfig['cognito']>) {
   const issuer = 'https://cognito-idp.' + c.region + '.amazonaws.com/' + c.userPoolId;
   const hosted = 'https://' + c.domain;
@@ -71,8 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStatus('anon');
       });
       try {
-        const u = window.location.pathname === '/auth/callback' ? await m.signinRedirectCallback() : await m.getUser();
-        if (window.location.pathname === '/auth/callback') window.history.replaceState({}, '', '/app');
+        const u = window.location.pathname === '/auth/callback' ? await (callbackExchange ??= m.signinRedirectCallback()) : await m.getUser();
         if (cancelled) return;
         if (u && !u.expired) {
           setUser({ email: String(u.profile.email), name: u.profile.name });

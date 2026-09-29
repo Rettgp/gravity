@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { Profile } from '@gravity/shared';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { Icon } from '../components/Icon';
 import { useFetcher } from '../lib/api';
 import { useAuth } from '../lib/auth';
@@ -20,6 +21,7 @@ export function Profiles() {
   const [emoji, setEmoji] = useState(EMOJI[1]!);
   const [color, setColor] = useState(COLORS[1]!);
   const [msg, setMsg] = useState('');
+  const [deleting, setDeleting] = useState<Profile | null>(null);
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['me'] });
   const fail = (e: Error) => setMsg(e.message);
@@ -64,7 +66,7 @@ export function Profiles() {
             {p.kind === 'managed' && (
               <>
                 <AddAdult onAdd={(email) => addMgr.mutate({ id: p.id, email })} />
-                <button className="btn btn-danger btn-sm" onClick={() => window.confirm('Delete ' + p.name + '?') && del.mutate(p.id)}>
+                <button className="btn btn-danger btn-sm" onClick={() => setDeleting(p)}>
                   Delete profile
                 </button>
               </>
@@ -114,6 +116,20 @@ export function Profiles() {
         </div>
         <button className="btn" disabled={!name.trim() || create.isPending} onClick={() => create.mutate()}>Add profile</button>
       </section>
+      {deleting && (
+        <ConfirmDialog
+          danger
+          title={'Delete ' + deleting.name + '?'}
+          message="Their profile is removed and no one will be able to open their journal. This cannot be undone."
+          confirmLabel="Delete profile"
+          onConfirm={async () => {
+            await del.mutateAsync(deleting.id);
+            setDeleting(null);
+          }}
+          onCancel={() => setDeleting(null)}
+        />
+      )}
+
       {msg && <p role="status" className="muted">{msg}</p>}
     </div>
   );

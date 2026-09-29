@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import {
   HttpError,
   canManage,
@@ -9,6 +10,7 @@ import {
   emptyDay,
   foodsOf,
   monthStr,
+  MEAL_KEYS,
   normalizeFood,
   parse,
   addDays,
@@ -57,6 +59,8 @@ export function buildJournalRouter({ db, table, coreTable, allowlist, now = () =
   };
   const allDays = async (pid: string) => (await db.query(table, `PROFILE#${pid}`, 'DAY#')).map(toDay);
   const today = () => now().toISOString().slice(0, 10);
+  /** Foods the person removed from their history. They stay out of suggestions until logged again on purpose. */
+  const hiddenFoods = async (pid: string) => new Set((await db.query(table, `PROFILE#${pid}`, 'HIDDENFOOD#')).map((i) => String(i.food)));
 
   const routes: Route[] = [
     {
@@ -94,6 +98,9 @@ export function buildJournalRouter({ db, table, coreTable, allowlist, now = () =
         }
         const day: Day = { ...input, date, updatedAt: now().toISOString(), updatedBy: user.sub };
         await db.put(table, { pk: `PROFILE#${p.id}`, sk: `DAY#${date}`, ...day });
+        // Logging a food again on purpose brings it back into suggestions.
+        const logged = foodsOf(day);
+        if (logged.length) for (const food of await hiddenFoods(p.id)) if (logged.includes(food)) await db.delete(table, `PROFILE#${p.id}`, `HIDDENFOOD#${food}`);
         const idx = { pk: `SHARED#${date.slice(0, 7)}`, sk: `${date}#${p.id}` };
         if (day.shared) {
           await db.put(table, { ...idx, profileId: p.id, date, unwell: day.unwell, symptomCount: day.symptoms.length });
@@ -120,11 +127,40 @@ export function buildJournalRouter({ db, table, coreTable, allowlist, now = () =
       handler: async ({ user, params }) => {
         const p = await manage(params.pid!, user.sub);
         const counts = new Map<string, number>();
-        for (const d of await allDays(p.id)) for (const f of foodsOf(d)) counts.set(f, (counts.get(f) ?? 0) + 1);
+        const hidden = await hiddenFoods(p.id);
+        for (const d of await allDays(p.id)) for (const f of foodsOf(d)) if (!hidden.has(f)) counts.set(f, (counts.get(f) ?? 0) + 1);
         return [...counts.entries()]
           .map(([food, count]) => ({ food: normalizeFood(food), count }))
           .sort((a, b) => b.count - a.count || a.food.localeCompare(b.food))
           .slice(0, 100);
+      },
+    },
+    {
+      // Forget a food everywhere (typos!): strips it from every day of the profile and reports how many days changed.
+      method: 'POST',
+      path: '/profiles/:pid/foods/remove',
+      handler: async ({ user, params, body }) => {
+        const p = await manage(params.pid!, user.sub);
+        const { food } = parse(z.object({ food: z.string().trim().min(1).max(80) }), body);
+        const target = normalizeFood(food);
+        let daysChanged = 0;
+        for (const day of await allDays(p.id)) {
+          let changed = false;
+          for (const k of MEAL_KEYS) {
+            const kept = day.meals[k].filter((f) => normalizeFood(f.text) !== target);
+            if (kept.length !== day.meals[k].length) {
+              day.meals[k] = kept;
+              changed = true;
+            }
+          }
+          if (!changed) continue;
+          daysChanged += 1;
+          const next: Day = { ...day, updatedAt: now().toISOString(), updatedBy: user.sub };
+          await db.put(table, { pk: `PROFILE#${p.id}`, sk: `DAY#${day.date}`, ...next });
+        }
+        // Permanent: hide it from suggestions even if no day contained it (so this can never "not find" anything).
+        await db.put(table, { pk: `PROFILE#${p.id}`, sk: `HIDDENFOOD#${target}`, food: target });
+        return { daysChanged };
       },
     },
     {

@@ -9,6 +9,13 @@ import { Profiles } from './pages/Profiles';
 
 const Landing = lazy(() => import('./pages/Landing').then((m) => ({ default: m.Landing })));
 
+/** OIDC return URL. Waits for the code exchange, then hands off to the router (never leaves a blank page). */
+function AuthCallback() {
+  const { status } = useAuth();
+  if (status === 'loading') return <div className="splash" aria-busy="true" />;
+  return <Navigate to={status === 'authed' ? '/app' : '/'} replace />;
+}
+
 function Protected() {
   const { status } = useAuth();
   if (status === 'loading') return <div className="splash" aria-busy="true" />;
@@ -30,7 +37,7 @@ export function App() {
       <Routes>
         <Route path="/" element={status === 'authed' ? <Navigate to="/app" replace /> : <Landing />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/auth/callback" element={<div className="splash" aria-busy="true" />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/app" element={<Protected />}>
           <Route index element={<Dashboard />} />
           <Route path="journal" element={<JournalPage />} />

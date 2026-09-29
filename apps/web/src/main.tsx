@@ -9,12 +9,14 @@ import './styles/app.css';
 import './styles/journal.css';
 import './styles/landing.css';
 import { App } from './App';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { AuthProvider } from './lib/auth';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } } });
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
+    <ErrorBoundary>
     <BrowserRouter>
       <AuthProvider>
         <QueryClientProvider client={queryClient}>
@@ -22,5 +24,6 @@ createRoot(document.getElementById('root')!).render(
         </QueryClientProvider>
       </AuthProvider>
     </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 );

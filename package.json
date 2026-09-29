@@ -18,7 +18,7 @@
     "brand": "tsx scripts/brand-assets.ts",
     "allowlist": "tsx scripts/allowlist.ts",
     "local": "concurrently -k -n api,web -c cyan,magenta \"npm:local:api\" \"npm:local:web\"",
-    "local:api": "tsx scripts/local-server.ts",
+    "local:api": "tsx watch scripts/local-server.ts",
     "local:web": "npm run dev -w apps/web",
     "local:reset": "node -e \"require('fs').rmSync('.gravity-local',{recursive:true,force:true})\"",
     "test:e2e": "playwright test",

@@ -4,6 +4,7 @@ import {
   emptyDay,
   foodsOf,
   generateDemoDays,
+  MEAL_KEYS,
   normalizeFood,
   type Day,
   type DayInput,
@@ -24,6 +25,8 @@ export interface JournalApi {
   getDay(pid: string, date: string): Promise<Day>;
   saveDay(pid: string, date: string, input: DayInput): Promise<Day>;
   foods(pid: string): Promise<FoodCount[]>;
+  /** Forget a food on every day (fixes typos that live on in suggestions). */
+  removeFood(pid: string, food: string): Promise<{ daysChanged: number }>;
   insights(pid: string): Promise<Insights>;
   shared(month: string): Promise<SharedDaySummary[]>;
 }
@@ -43,6 +46,7 @@ export function useHttpJournalApi(): JournalApi {
       getDay: (pid, date) => f('/api/journal/profiles/' + pid + '/days/' + date),
       saveDay: (pid, date, input) => f('/api/journal/profiles/' + pid + '/days/' + date, { method: 'PUT', body: input }),
       foods: (pid) => f('/api/journal/profiles/' + pid + '/foods'),
+      removeFood: (pid, food) => f('/api/journal/profiles/' + pid + '/foods/remove', { method: 'POST', body: { food } }),
       insights: (pid) => f('/api/journal/profiles/' + pid + '/insights'),
       shared: (month) => f('/api/journal/shared?month=' + month),
     }),
@@ -78,6 +82,22 @@ export function createDemoApi(today: string): JournalApi {
       const counts = new Map<string, number>();
       for (const d of days.values()) for (const f of foodsOf(d)) counts.set(f, (counts.get(f) ?? 0) + 1);
       return [...counts].map(([food, count]) => ({ food: normalizeFood(food), count })).sort((a, b) => b.count - a.count).slice(0, 40);
+    },
+    async removeFood(_pid, food) {
+      const target = normalizeFood(food);
+      let daysChanged = 0;
+      for (const d of days.values()) {
+        let changed = false;
+        for (const k of MEAL_KEYS) {
+          const kept = d.meals[k].filter((x) => normalizeFood(x.text) !== target);
+          if (kept.length !== d.meals[k].length) {
+            d.meals[k] = kept;
+            changed = true;
+          }
+        }
+        if (changed) daysChanged += 1;
+      }
+      return { daysChanged };
     },
     async insights() {
       return computeInsights([...days.values()]);
