@@ -4,16 +4,19 @@ import { useQuery } from '@tanstack/react-query';
 import { METRIC_INFO, addDays, computeHeadsUp, type HealthDay } from '@gravity/shared';
 import { Icon } from '../../components/Icon';
 import { localToday } from '../../lib/dates';
+import { tempLabel, tempValue, useTempUnit, type TempUnit } from '../../lib/units';
 import { useHealthApi } from './api';
 
-const fmt = (key: keyof typeof METRIC_INFO, v: number) => {
+const fmt = (key: keyof typeof METRIC_INFO, v: number, unit: TempUnit, delta = false) => {
   const i = METRIC_INFO[key]!;
+  if (key === 'skinTempC') return tempValue(v, unit, delta).toFixed(i.digits) + ' ' + tempLabel(unit);
   return v.toFixed(i.digits) + (i.unit ? ' ' + i.unit : '');
 };
 
 /** Gentle nudge when two or more early-warning numbers are outside a person's own normal. Renders nothing otherwise. */
 export function HeadsUp({ days }: { days: HealthDay[] }) {
   const today = localToday();
+  const [unit] = useTempUnit();
   const signals = useMemo(() => computeHeadsUp(days, today), [days, today]);
   if (signals.length === 0) return null;
   return (
@@ -24,7 +27,7 @@ export function HeadsUp({ days }: { days: HealthDay[] }) {
         <ul>
           {signals.map((s) => (
             <li key={s.key}>
-              {METRIC_INFO[s.key]!.label} {fmt(s.key, Math.abs(s.diff))} {s.diff > 0 ? 'above' : 'below'} your usual ({fmt(s.key, s.value)} vs {fmt(s.key, s.usual)})
+              {METRIC_INFO[s.key]!.label} {fmt(s.key, Math.abs(s.diff), unit, true)} {s.diff > 0 ? 'above' : 'below'} your usual ({fmt(s.key, s.value, unit)} vs {fmt(s.key, s.usual, unit)})
             </li>
           ))}
         </ul>

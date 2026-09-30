@@ -116,15 +116,18 @@ export function BigChart({ def, points, from, to, usual, unwell }: Props) {
       <div className="hl-readout" role="status" aria-live={keyboard ? 'polite' : 'off'}>
         {selDate ? (
           <>
-            <span className="muted">{fullDate(selDate)}</span>
-            {selVal !== undefined ? <strong>{withUnit(def, selVal)}</strong> : <span className="muted">No data</span>}
-            {diff !== undefined && (
-              <span className="muted">{Math.abs(diff) < half ? 'about your usual' : `${showDiff(def, diff)} ${diff > 0 ? 'above' : 'below'} your usual`}</span>
-            )}
-            {unwell.has(selDate) && <span className="hl-chip-unwell">Felt unwell</span>}
+            <span className="hl-readout-date muted">{fullDate(selDate)}</span>
+            <div className="hl-readout-main">
+              {/* "No data" is the same size as a value, so the chart below never shifts as the readout changes. */}
+              {selVal !== undefined ? <strong>{withUnit(def, selVal)}</strong> : <strong className="hl-readout-none">No data</strong>}
+              {diff !== undefined && (
+                <span className="muted">{Math.abs(diff) < half ? 'about your usual' : `${showDiff(def, diff)} ${diff > 0 ? 'above' : 'below'} your usual`}</span>
+              )}
+              {unwell.has(selDate) && <span className="hl-chip-unwell">Felt unwell</span>}
+            </div>
           </>
         ) : (
-          <span className="muted">No data in this range</span>
+          <span className="hl-readout-date muted">No data in this range</span>
         )}
       </div>
       <div

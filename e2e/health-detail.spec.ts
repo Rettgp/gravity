@@ -81,6 +81,23 @@ test.describe('health card detail view', () => {
     await page.locator('.jr-scrim').click({ position: { x: 5, y: 5 } });
     await expect(sleep).toBeHidden();
 
+    // Temperature defaults to Fahrenheit, with a toggle that applies everywhere and is remembered.
+    const skin = page.locator('.hl-tile', { hasText: 'Skin temperature' });
+    await expect(skin).toContainText('°F');
+    await expect(skin).not.toContainText('°C');
+    await skin.getByRole('button', { name: 'Open Skin temperature details' }).click();
+    const temp = page.getByRole('dialog', { name: 'Skin temperature' });
+    await expect(temp.getByRole('status').first()).toContainText('°F');
+    await temp.getByRole('group', { name: 'Temperature unit' }).getByRole('button', { name: '°C' }).click();
+    await expect(temp.getByRole('status').first()).toContainText('°C');
+    await expect(temp.getByRole('status').first()).not.toContainText('°F');
+    await page.keyboard.press('Escape');
+    await expect(skin).toContainText('°C');
+    await page.reload();
+    await expect(page.locator('.hl-tile', { hasText: 'Skin temperature' })).toContainText('°C'); // remembered
+    await page.getByRole('group', { name: 'Temperature unit' }).getByRole('button', { name: '°F' }).click();
+    await expect(page.locator('.hl-tile', { hasText: 'Skin temperature' })).toContainText('°F');
+
     // Clean up so the next spec starts from "not connected".
     await page.getByRole('button', { name: 'Disconnect' }).click();
     await page.getByRole('alertdialog').getByRole('button', { name: 'Disconnect and delete' }).click();

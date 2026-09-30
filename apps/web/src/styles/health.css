@@ -65,8 +65,6 @@
 
 .hl-big { display: grid; gap: 4px; min-width: 0; }
 .hl-sub-h { font-size: 15px; font-family: var(--font-ui); font-weight: 600; letter-spacing: 0; margin-top: 8px; }
-.hl-readout { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; min-height: 30px; font-size: 14px; }
-.hl-readout strong { font-family: var(--font-display); font-size: 20px; }
 .hl-chip-unwell { padding: 1px 10px; border-radius: 999px; font-size: 12px; background: var(--unwell-bg); border: 1px solid var(--coral); color: var(--text); }
 .hl-chart-wrap { border-radius: 12px; touch-action: pan-y; line-height: 0; }
 .hl-chart-wrap:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
@@ -119,3 +117,20 @@
 .hl-scroll-tall thead th { position: sticky; top: 0; background: var(--surface-2); }
 
 .hl-band-label { paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; }
+
+/* Readout: fixed rows, so the chart never moves when the value changes or is missing. */
+.hl-readout { display: grid; gap: 2px; align-content: start; min-height: 58px; }
+.hl-readout.is-stages { min-height: 84px; }
+.hl-readout-date { font-size: 13px; line-height: 20px; }
+.hl-readout-main { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 12px; min-height: 30px; }
+.hl-readout-main strong { font-family: var(--font-display); font-size: 20px; line-height: 30px; }
+.hl-readout-none { color: var(--muted); font-weight: 500; }
+.hl-readout-detail { font-size: 13px; line-height: 20px; min-height: 20px; }
+@media (max-width: 560px) {
+  .hl-readout { min-height: 88px; }
+  .hl-readout.is-stages { min-height: 132px; }
+  .hl-readout-detail { min-height: 40px; }
+}
+
+.hl-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.hl-units { display: inline-flex; gap: 6px; }

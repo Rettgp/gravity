@@ -4,6 +4,7 @@ import { motion } from 'motion/react';
 import { addDays, type HealthDay } from '@gravity/shared';
 import { Icon } from '../../components/Icon';
 import { localToday } from '../../lib/dates';
+import { tempLabel, useTempUnit } from '../../lib/units';
 import { useHttpJournalApi } from '../journal/api';
 import { BigChart } from './BigChart';
 import { dayName, fmtDuration, fullDate, show, showDiff, withUnit, type MetricDef } from './metrics';
@@ -41,6 +42,7 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 /** Full-screen-ish view of one number: big chart, range picker, stats, what it means, and the raw values. */
 export function MetricDetail({ def, pid, days, loadingYear, onClose }: Props) {
   const today = localToday();
+  const [unit, setUnit] = useTempUnit();
   const [range, setRange] = useState<(typeof RANGES)[number]['days']>(30);
   const closeRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -112,12 +114,23 @@ export function MetricDetail({ def, pid, days, loadingYear, onClose }: Props) {
           </button>
         </header>
 
-        <div className="hl-range" role="group" aria-label="Time range">
-          {RANGES.map((r) => (
-            <button key={r.days} className={'jr-tab' + (range === r.days ? ' on' : '')} aria-pressed={range === r.days} onClick={() => setRange(r.days)}>
-              {r.label}
-            </button>
-          ))}
+        <div className="hl-controls">
+          <div className="hl-range" role="group" aria-label="Time range">
+            {RANGES.map((r) => (
+              <button key={r.days} className={'jr-tab' + (range === r.days ? ' on' : '')} aria-pressed={range === r.days} onClick={() => setRange(r.days)}>
+                {r.label}
+              </button>
+            ))}
+          </div>
+          {def.key === 'skinTempC' && (
+            <div className="hl-units" role="group" aria-label="Temperature unit">
+              {(['F', 'C'] as const).map((u) => (
+                <button key={u} className="chip" aria-pressed={unit === u} onClick={() => setUnit(u)}>
+                  {tempLabel(u)}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {loadingYear && range > 90 && <p className="muted hl-fine">Loading the full year...</p>}

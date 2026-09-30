@@ -1,46 +1,54 @@
 import { useQuery } from '@tanstack/react-query';
 import { METRIC_INFO, type BodySignal, type FoodBodyEffect, type HealthMetricKey } from '@gravity/shared';
+import { tempLabel, tempValue, useTempUnit, type TempUnit } from '../../lib/units';
 import { useJournalApi } from './api';
 
 const dur = (min: number) => `${Math.floor(Math.abs(min) / 60)}h ${String(Math.round(Math.abs(min) % 60)).padStart(2, '0')}m`;
 /** A difference in sleep: 43 min, 1h 05m. */
 const durGap = (min: number) => (Math.abs(min) < 60 ? `${Math.round(Math.abs(min))} min` : dur(min));
-const value = (key: HealthMetricKey, v: number) => {
+const unitText = (key: HealthMetricKey, unit: TempUnit) => (key === 'skinTempC' ? tempLabel(unit) : METRIC_INFO[key]!.unit);
+const value = (key: HealthMetricKey, v: number, unit: TempUnit) => {
   const i = METRIC_INFO[key]!;
   if (key === 'sleepMinutes') return dur(v);
   if (key === 'steps') return Math.round(v).toLocaleString();
-  return v.toFixed(i.digits) + (i.unit ? ' ' + i.unit : '');
+  const shown = key === 'skinTempC' ? tempValue(v, unit) : v;
+  return shown.toFixed(i.digits) + (unitText(key, unit) ? ' ' + unitText(key, unit) : '');
 };
-const gap = (key: HealthMetricKey, diff: number) => {
+const gap = (key: HealthMetricKey, diff: number, unit: TempUnit) => {
   const i = METRIC_INFO[key]!;
   const a = Math.abs(diff);
-  return key === 'sleepMinutes' ? durGap(a) : key === 'steps' ? Math.round(a).toLocaleString() : a.toFixed(i.digits) + (i.unit ? ' ' + i.unit : '');
+  if (key === 'sleepMinutes') return durGap(a);
+  if (key === 'steps') return Math.round(a).toLocaleString();
+  const shown = key === 'skinTempC' ? tempValue(a, unit, true) : a;
+  return shown.toFixed(i.digits) + (unitText(key, unit) ? ' ' + unitText(key, unit) : '');
 };
 
 function SignalRow({ s }: { s: BodySignal }) {
+  const [unit] = useTempUnit();
   const i = METRIC_INFO[s.key]!;
   const dir = s.diff > 0 ? 'higher' : 'lower';
   const before = s.dayBefore && Math.sign(s.dayBefore.diff) === Math.sign(s.diff) && Math.abs(s.dayBefore.effect) >= 0.3 ? s.dayBefore : undefined;
   return (
     <li className="jr-signal">
-      <strong>{i.label}</strong> is {gap(s.key, s.diff)} {dir} on unwell days
+      <strong>{i.label}</strong> is {gap(s.key, s.diff, unit)} {dir} on unwell days
       <span className="muted">
         {' '}
-        ({value(s.key, s.unwellMean)} vs {value(s.key, s.wellMean)}), on {s.consistent} of {s.unwellDays} of them.
-        {before ? ` The day before, it was already ${gap(s.key, before.diff)} ${dir} (${before.days} days).` : ''}
+        ({value(s.key, s.unwellMean, unit)} vs {value(s.key, s.wellMean, unit)}), on {s.consistent} of {s.unwellDays} of them.
+        {before ? ` The day before, it was already ${gap(s.key, before.diff, unit)} ${dir} (${before.days} days).` : ''}
       </span>
     </li>
   );
 }
 
 function FoodRow({ f }: { f: FoodBodyEffect }) {
+  const [unit] = useTempUnit();
   const i = METRIC_INFO[f.key]!;
   return (
     <li className="jr-signal">
-      After <strong>{f.food}</strong>, next-morning {i.label.toLowerCase()} is {gap(f.key, f.diff)} {f.diff > 0 ? 'higher' : 'lower'}
+      After <strong>{f.food}</strong>, next-morning {i.label.toLowerCase()} is {gap(f.key, f.diff, unit)} {f.diff > 0 ? 'higher' : 'lower'}
       <span className="muted">
         {' '}
-        ({value(f.key, f.mean)} vs {value(f.key, f.baseline)} otherwise, {f.exposedDays} days).
+        ({value(f.key, f.mean, unit)} vs {value(f.key, f.baseline, unit)} otherwise, {f.exposedDays} days).
       </span>
     </li>
   );

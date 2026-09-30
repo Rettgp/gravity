@@ -1,4 +1,5 @@
 import { addDays, type HealthDay, type HealthMetricKey } from '@gravity/shared';
+import { tempLabel, tempValue, type TempUnit } from '../../lib/units';
 
 export const fmtDuration = (min: number) => `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`;
 /** Short form for differences: 25m, 1h 05m. */
@@ -19,7 +20,7 @@ export interface MetricDef {
   about: { what: string; moves: string };
 }
 
-export const METRICS: MetricDef[] = [
+const BASE_METRICS: MetricDef[] = [
   {
     key: 'restingHr',
     label: 'Resting heart rate',
@@ -87,7 +88,7 @@ export const METRICS: MetricDef[] = [
     chart: 'line',
     about: {
       what: 'Your wrist skin temperature during sleep. It is lower than core body temperature and depends on the room, so the absolute number matters less than how it changes.',
-      moves: 'A rise of a few tenths of a degree above your usual can show up before or during illness. The watch needs about three nights to learn your baseline.',
+      moves: 'A rise of a few tenths of a degree Celsius (about half a degree Fahrenheit) above your usual can show up before or during illness. The watch needs about three nights to learn your baseline.',
     },
   },
   {
@@ -102,6 +103,21 @@ export const METRICS: MetricDef[] = [
     },
   },
 ];
+
+/** The metric list with temperature in the chosen unit. Pair it with toDisplayDays so numbers and labels agree. */
+export const metricsFor = (unit: TempUnit): MetricDef[] => BASE_METRICS.map((m) => (m.key === 'skinTempC' ? { ...m, unit: tempLabel(unit) } : m));
+
+/** The API stores temperature in Celsius; convert the temperature fields for display. Everything else is untouched. */
+export function toDisplayDays(days: HealthDay[], unit: TempUnit): HealthDay[] {
+  if (unit === 'C') return days;
+  return days.map((d) => {
+    if (d.skinTempC === undefined && d.skinTempDelta === undefined) return d;
+    const out = { ...d };
+    if (d.skinTempC !== undefined) out.skinTempC = tempValue(d.skinTempC, unit);
+    if (d.skinTempDelta !== undefined) out.skinTempDelta = tempValue(d.skinTempDelta, unit, true);
+    return out;
+  });
+}
 
 export const show = (m: MetricDef, v: number) => (m.format ? m.format(v) : v.toFixed(m.digits ?? 0));
 export const withUnit = (m: MetricDef, v: number) => show(m, v) + (m.unit ? ' ' + m.unit : '');

@@ -79,18 +79,14 @@ export function StagesChart({ days, from, to }: Props) {
   return (
     <div className="hl-big" ref={ref}>
       <h3 className="hl-sub-h">Sleep stages</h3>
-      <div className="hl-readout" role="status" aria-live={keyboard ? 'polite' : 'off'}>
-        <span className="muted">{fullDate(dates[Math.max(0, sel)]!)}</span>
-        {selDay ? (
-          <>
-            <strong>{fmtDuration(total(selDay) - (selDay.sleepAwakeMin ?? 0))} asleep</strong>
-            <span className="muted">
-              {STAGES.map((s) => `${s.label} ${fmtDuration((selDay[s.key] as number | undefined) ?? 0)}`).join(' · ')}
-            </span>
-          </>
-        ) : (
-          <span className="muted">No stage data</span>
-        )}
+      <div className="hl-readout is-stages" role="status" aria-live={keyboard ? 'polite' : 'off'}>
+        <span className="hl-readout-date muted">{fullDate(dates[Math.max(0, sel)]!)}</span>
+        <div className="hl-readout-main">
+          {selDay ? <strong>{fmtDuration(total(selDay) - (selDay.sleepAwakeMin ?? 0))} asleep</strong> : <strong className="hl-readout-none">No stage data</strong>}
+        </div>
+        <span className="hl-readout-detail muted">
+          {selDay ? STAGES.map((s) => `${s.label} ${fmtDuration((selDay[s.key] as number | undefined) ?? 0)}`).join(' · ') : ''}
+        </span>
       </div>
       <div
         className="hl-chart-wrap"

@@ -1,17 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence } from 'motion/react';
-import { addDays, compareToUsual, seriesFor, type HealthDay, type HealthLink, type ProfileSummary } from '@gravity/shared';
+import { addDays, compareToUsual, seriesFor, type HealthDay, type HealthLink, type HealthMetricKey, type ProfileSummary } from '@gravity/shared';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Icon } from '../../components/Icon';
 import { localToday } from '../../lib/dates';
+import { tempLabel, useTempUnit } from '../../lib/units';
 import { useHealthApi } from './api';
 import { HeadsUp } from './HeadsUp';
-import { METRICS, dayName, show, showDiff, type MetricDef } from './metrics';
+import { dayName, metricsFor, show, toDisplayDays, type MetricDef } from './metrics';
 import { MetricDetail } from './MetricDetail';
 import { Sparkline } from './Sparkline';
 
 const WINDOW = 30;
+const NO_DAYS: HealthDay[] = [];
 const ago = (iso?: string) => {
   if (!iso) return 'never';
   const min = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
@@ -81,7 +83,7 @@ function Tile({ def, days, today, onOpen }: { def: MetricDef; days: HealthDay[];
   );
 }
 
-function DataTable({ days, today }: { days: HealthDay[]; today: string }) {
+function DataTable({ days, today, metrics }: { days: HealthDay[]; today: string; metrics: MetricDef[] }) {
   const rows = Array.from({ length: 14 }, (_, i) => addDays(today, -i));
   const byDate = new Map(days.map((d) => [d.date, d]));
   return (
@@ -92,7 +94,7 @@ function DataTable({ days, today }: { days: HealthDay[]; today: string }) {
           <thead>
             <tr>
               <th scope="col">Day</th>
-              {METRICS.map((m) => (
+              {metrics.map((m) => (
                 <th scope="col" key={m.key}>
                   {m.label}
                 </th>
@@ -103,7 +105,7 @@ function DataTable({ days, today }: { days: HealthDay[]; today: string }) {
             {rows.map((date) => (
               <tr key={date}>
                 <th scope="row">{dayName(date, today)}</th>
-                {METRICS.map((m) => {
+                {metrics.map((m) => {
                   const v = byDate.get(date)?.[m.key];
                   return <td key={m.key}>{typeof v === 'number' ? show(m, v) : '–'}</td>;
                 })}
@@ -132,7 +134,9 @@ export function HealthView({ profiles, defaultProfileId, justConnected }: Props)
   const [error, setError] = useState('');
   const [confirm, setConfirm] = useState(false);
   const tried = useRef(new Set<string>());
-  const [open, setOpen] = useState<MetricDef | null>(null);
+  const [openKey, setOpenKey] = useState<HealthMetricKey | null>(null);
+  const [unit, setUnit] = useTempUnit();
+  const metrics = useMemo(() => metricsFor(unit), [unit]);
   const opener = useRef<HTMLElement | null>(null);
 
   const linkQ = useQuery({ queryKey: ['health', 'link', pid], queryFn: () => api.link(pid) });
@@ -142,15 +146,19 @@ export function HealthView({ profiles, defaultProfileId, justConnected }: Props)
     queryFn: () => api.days(pid, addDays(today, -89), today),
     enabled: !!link?.connected,
   });
-  const days = daysQ.data ?? [];
+  const rawDays = daysQ.data ?? NO_DAYS;
+  // The API stores Celsius. `rawDays` feeds the heads-up (its thresholds are in Celsius); `days` is what people see.
+  const days = useMemo(() => toDisplayDays(rawDays, unit), [rawDays, unit]);
   // The detail view can show a whole year; load it only when someone opens a card.
   const yearQ = useQuery({
     queryKey: ['health', 'days', pid, 'year'],
     queryFn: () => api.days(pid, addDays(today, -364), today),
-    enabled: !!open && !!link?.connected,
+    enabled: !!openKey && !!link?.connected,
   });
+  const yearDays = useMemo(() => toDisplayDays(yearQ.data ?? rawDays, unit), [yearQ.data, rawDays, unit]);
+  const openDef = openKey ? metrics.find((m) => m.key === openKey) : undefined;
   const closeDetail = useCallback(() => {
-    setOpen(null);
+    setOpenKey(null);
     requestAnimationFrame(() => opener.current?.focus());
   }, []);
 
@@ -209,14 +217,14 @@ export function HealthView({ profiles, defaultProfileId, justConnected }: Props)
   }, [link, today]);
 
   const name = profiles.find((p) => p.id === pid)?.name ?? '';
-  const hasAny = days.some((d) => METRICS.some((m) => typeof d[m.key] === 'number'));
+  const hasAny = days.some((d) => metrics.some((m) => typeof d[m.key] === 'number'));
 
   return (
     <div className="hl">
       {profiles.length > 1 && (
         <div className="jr-chips" role="group" aria-label="Whose health">
           {profiles.map((p) => (
-            <button key={p.id} className="chip" aria-pressed={pid === p.id} onClick={() => (setOpen(null), setPid(p.id))}>
+            <button key={p.id} className="chip" aria-pressed={pid === p.id} onClick={() => (setOpenKey(null), setPid(p.id))}>
               <span aria-hidden="true">{p.emoji}</span> {p.name}
             </button>
           ))}
@@ -261,6 +269,13 @@ export function HealthView({ profiles, defaultProfileId, justConnected }: Props)
               <p className="muted hl-fine">{busy ? 'Syncing...' : 'Last synced ' + ago(link.lastSyncAt)}</p>
             </div>
             <div className="hl-actions">
+              <div className="hl-units" role="group" aria-label="Temperature unit">
+                {(['F', 'C'] as const).map((u) => (
+                  <button key={u} className="chip" aria-pressed={unit === u} onClick={() => setUnit(u)}>
+                    {tempLabel(u)}
+                  </button>
+                ))}
+              </div>
               <button className="btn btn-ghost btn-sm" onClick={() => void runSync()} disabled={busy}>
                 Sync now
               </button>
@@ -285,9 +300,9 @@ export function HealthView({ profiles, defaultProfileId, justConnected }: Props)
           )}
           {hasAny && (
             <>
-              <HeadsUp days={days} />
+              <HeadsUp days={rawDays} />
               <ul className="hl-grid" aria-label="Trends">
-                {METRICS.map((m) => (
+                {metrics.map((m) => (
                   <Tile
                     key={m.key}
                     def={m}
@@ -295,12 +310,12 @@ export function HealthView({ profiles, defaultProfileId, justConnected }: Props)
                     today={today}
                     onOpen={(el) => {
                       opener.current = el;
-                      setOpen(m);
+                      setOpenKey(m.key);
                     }}
                   />
                 ))}
               </ul>
-              <DataTable days={days} today={today} />
+              <DataTable days={days} today={today} metrics={metrics} />
             </>
           )}
         </>
@@ -313,7 +328,7 @@ export function HealthView({ profiles, defaultProfileId, justConnected }: Props)
       )}
 
       <AnimatePresence>
-        {open && link?.connected && <MetricDetail key={open.key} def={open} pid={pid} days={yearQ.data ?? days} loadingYear={yearQ.isLoading} onClose={closeDetail} />}
+        {openDef && link?.connected && <MetricDetail key={openDef.key} def={openDef} pid={pid} days={yearDays} loadingYear={yearQ.isLoading} onClose={closeDetail} />}
       </AnimatePresence>
 
       {confirm && (
