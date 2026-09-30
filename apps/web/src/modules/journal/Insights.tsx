@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { dayLabel } from '../../lib/dates';
 import { useJournalApi } from './api';
+import { BodySignalsCard } from './BodySignalsCard';
 
 export function Insights({ pid }: { pid: string }) {
   const api = useJournalApi();
@@ -57,6 +58,8 @@ export function Insights({ pid }: { pid: string }) {
           </ul>
         )}
       </section>
+
+      <BodySignalsCard pid={pid} />
 
       {symptoms.length > 0 && (
         <section className="card" aria-labelledby="sym-h">

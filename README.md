@@ -39,7 +39,7 @@ Five independent gates; each alone blocks strangers:
 
 The allowlist lives in SSM (`/gravity/allowed-emails`): `npm run allowlist -- add mom@gmail.com`. Turn on 2-step verification or passkeys on each Google account for free MFA.
 
-The landing page is public but contains no data. Journal entries are private to their profile; a day can be shared with the family, which reveals only the unwell flag and symptoms, never meals or notes. Deleting a profile does not delete its journal rows (they become unreachable); purge them from the `gravity-journal` table if needed.
+The landing page is public but contains no data. Journal entries are private to their profile; a day can be shared with the family, which reveals only the unwell flag and symptoms, never meals or notes. Deleting a profile does not delete its journal or health rows (they become unreachable); purge them from the `gravity-journal` / `gravity-health` tables if needed.
 
 ## Deploying (one time, ~15 minutes)
 
@@ -49,3 +49,22 @@ The landing page is public but contains no data. Journal entries are private to 
 4. The output prints `GoogleRedirectUri`. Add it as an **Authorized redirect URI** on the Google client, then open `SiteUrl`.
 
 Estimated cost for a family of a few people: about $0.10-$0.25 per month.
+
+## Health data (Fitbit + iPhone, optional)
+
+Each person can connect their Google Health account (the Fitbit successor; the old Fitbit Web API shuts down on 2026-10-30) on the **Health** page. Gravity pulls sleep, resting heart rate, HRV, SpO2, skin temperature, breathing rate and steps every 4 hours and keeps them per profile. Anything an iPhone shares with the Google Health app (Connections, Apps and services, Apple Health) comes through too, and steps are de-duplicated between watch and phone. Skin temperature, HRV and sleep only exist for nights the watch is worn to bed.
+
+One-time setup, after the normal deploy above:
+
+1. **Google Cloud.** In the same project, enable the *Google Health API*, and under Data access add `googlehealth.activity_and_fitness.readonly`, `googlehealth.health_metrics_and_measurements.readonly` and `googlehealth.sleep.readonly`. Create a second OAuth client (Web application) for health with the authorized redirect URI `<SiteUrl>/app/health/callback` (add `http://localhost:5174/app/health/callback` if you want to try it locally against real Google). Publish the consent screen to *In production*; unverified apps are capped at 100 users, which is plenty, and each person clicks through Google's "hasn't verified this app" screen once. Publishing needs the home page and `/privacy.html` to pass brand checks (Search Console ownership of the site URL).
+2. **Store the client secret in SSM**, not in the repo or CloudFormation:
+   ```bash
+   aws ssm put-parameter --region us-east-2 --name /gravity/health/google-client-secret --type SecureString --value 'GOCSPX-...'
+   ```
+   Run it in PowerShell or cmd. Git Bash on Windows rewrites `/gravity/...` into a file path and stores the wrong name (use `MSYS_NO_PATHCONV=1 aws ...` there). The secret must be the one for the *health* client, not the sign-in client. Check it landed with `aws ssm describe-parameters --region us-east-2 --query "Parameters[].Name"`.
+3. Put the client **ID** in `.env.local` as `GOOGLE_HEALTH_CLIENT_ID`, then `npm run deploy`. Without it the Health page says "not set up" and nothing can be connected.
+4. Each person opens **Health** and taps *Connect Google Health*. The first year of history imports in the background.
+
+How it stays private: every request goes through the same JWT authorizer as everything else (there is no unauthenticated route); health data is never part of the shared family feed and only a profile's managers can read it; refresh tokens live in SSM SecureStrings under `/gravity/health/tokens/` (free, unlike Secrets Manager) and the function may only touch that prefix; the scheduled sync skips anyone removed from the allowlist. *Disconnect* revokes access at Google and deletes every imported day. Google refresh tokens can lapse; the page then offers *Reconnect*.
+
+Locally (`npm run local`) a fake Google stands in: *Connect* bounces straight back and invents believable numbers, so the whole flow works with no credentials.

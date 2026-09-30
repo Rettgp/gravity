@@ -3,9 +3,12 @@
  * Auth is a dev-only header (x-dev-user: <email>), so it must never be deployed. It only listens on localhost.
  */
 import { createServer } from 'node:http';
-import { generateDemoDays, MemoryDb, normalizeEmail } from '@gravity/shared/server';
+import { addDays, generateDemoDays, MemoryDb, normalizeEmail } from '@gravity/shared/server';
 import { buildCoreRouter } from '../services/core/src/router';
 import { buildJournalRouter } from '../services/journal/src/router';
+import { FakeGoogle, fakeDay } from '../services/health/src/fake';
+import { buildHealthRouter } from '../services/health/src/router';
+import { MemoryTokens } from '../services/health/src/tokens';
 
 const PORT = Number(process.env.PORT ?? 8787);
 const FILE = process.env.GRAVITY_LOCAL_DB ?? '.gravity-local/db.json';
@@ -17,7 +20,17 @@ const ALLOWED = (process.env.LOCAL_ALLOWED_EMAILS ?? 'mom@gravity.local,dad@grav
 const db = new MemoryDb(FILE);
 const allowlist = async () => ALLOWED;
 const core = buildCoreRouter({ db, table: 'core', allowlist });
-const journal = buildJournalRouter({ db, table: 'journal', coreTable: 'core', allowlist });
+const journal = buildJournalRouter({ db, table: 'journal', coreTable: 'core', healthTable: 'health', allowlist });
+// No Google in local mode: the fake bounces straight back as if consent was granted, and invents believable numbers.
+const health = buildHealthRouter({
+  db,
+  table: 'health',
+  coreTable: 'core',
+  allowlist,
+  google: new FakeGoogle(),
+  tokens: new MemoryTokens(),
+  redirectOk: (uri) => /^http:\/\/localhost:\d+\/app\/health\/callback$/.test(uri),
+});
 
 const nameOf = (email: string) => {
   const n = email.split('@')[0] ?? 'dev';
@@ -53,13 +66,31 @@ createServer(async (req, res) => {
     if (!me || me.status !== 200) return send(res, 403, { error: 'Not allowed' });
     const pid = (me.body as { defaultProfileId: string }).defaultProfileId;
     const today = new Date().toISOString().slice(0, 10);
-    for (const d of generateDemoDays(today, 45)) {
+    const demo = generateDemoDays(today, 45);
+    const unwell = new Set(demo.filter((d) => d.unwell).map((d) => d.date));
+    for (const d of demo) {
       const { date, ...input } = d;
       await journal({ ...r, method: 'PUT', path: '/api/journal/profiles/' + pid + '/days/' + date, body: { ...input, shared: false } });
+      // Body numbers that behave like a real body: worse on unwell days, a little worse the day before. Today looks
+      // off too, so the early heads-up has something to show.
+      const m = fakeDay(date);
+      const before = unwell.has(addDays(date, 1));
+      const off = unwell.has(date) ? 1 : before ? 0.5 : date >= addDays(today, -1) ? 1.8 : 0;
+      await db.put('health', {
+        pk: 'PROFILE#' + pid,
+        sk: 'DAY#' + date,
+        ...m,
+        date,
+        restingHr: Math.round((m.restingHr ?? 64) + 6 * off),
+        hrv: Math.round(((m.hrv ?? 40) - 10 * off) * 10) / 10,
+        sleepMinutes: Math.round((m.sleepMinutes ?? 420) - 50 * off),
+        skinTempC: Math.round(((m.skinTempC ?? 32) + 0.3 * off) * 100) / 100,
+        syncedAt: new Date().toISOString(),
+      });
     }
     return send(res, 200, { ok: true });
   }
 
-  const out = url.pathname.startsWith('/api/core') ? await core(r) : url.pathname.startsWith('/api/journal') ? await journal(r) : { status: 404, body: { error: 'Not found' } };
+  const out = url.pathname.startsWith('/api/core') ? await core(r) : url.pathname.startsWith('/api/journal') ? await journal(r) : url.pathname.startsWith('/api/health') ? await health(r) : { status: 404, body: { error: 'Not found' } };
   send(res, out.status, out.body);
 }).listen(PORT, '127.0.0.1', () => console.log('[gravity] local API on http://127.0.0.1:' + PORT + ' (allowed: ' + ALLOWED.join(', ') + ')'));

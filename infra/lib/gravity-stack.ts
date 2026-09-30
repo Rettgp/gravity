@@ -29,6 +29,9 @@ import {
   UserPoolClientIdentityProvider,
   UserPoolIdentityProviderGoogle,
 } from 'aws-cdk-lib/aws-cognito';
+import { Rule, Schedule } from 'aws-cdk-lib/aws-events';
+import { LambdaFunction } from 'aws-cdk-lib/aws-events-targets';
+import { PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { Architecture, Runtime } from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { LogGroup, RetentionDays } from 'aws-cdk-lib/aws-logs';
@@ -44,11 +47,18 @@ export interface GravityStackProps extends StackProps {
   allowedEmails: string;
   googleClientId: string;
   googleClientSecret: string;
+  /**
+   * OAuth client ID for the Google Health API (a separate client from the sign-in one, same Google Cloud project).
+   * Optional: without it the Health page reports "not set up" and nothing can be connected. The matching client secret
+   * is never in CloudFormation: create it by hand as the SecureString /gravity/health/google-client-secret (see README).
+   */
+  googleHealthClientId?: string;
   /** Built web app (apps/web/dist). Falls back to an empty folder for synth-only runs. */
   webDist?: string;
 }
 
 export const ALLOWLIST_PARAM = '/gravity/allowed-emails';
+export const HEALTH_SECRET_PARAM = '/gravity/health/google-client-secret';
 
 export class GravityStack extends Stack {
   constructor(scope: Construct, id: string, props: GravityStackProps) {
@@ -207,12 +217,39 @@ export class GravityStack extends Stack {
       jwtAudience: [client.userPoolClientId],
     });
     const core = new GravityService(this, 'Core', { name: 'core', api, authorizer, allowlist });
+
+    const health = new GravityService(this, 'Health', {
+      name: 'health',
+      api,
+      authorizer,
+      allowlist,
+      readTables: [{ table: core.table, envName: 'CORE_TABLE' }],
+      timeout: Duration.seconds(28),
+      environment: {
+        HEALTH_REDIRECT_URIS: [siteUrl, 'http://localhost:5174'].map((o) => o + '/app/health/callback').join(','),
+        GOOGLE_HEALTH_SECRET_PARAM: HEALTH_SECRET_PARAM,
+        ...(props.googleHealthClientId?.trim() ? { GOOGLE_HEALTH_CLIENT_ID: props.googleHealthClientId.trim() } : {}),
+      },
+    });
+    // Refresh tokens live in SSM SecureStrings (free, unlike Secrets Manager); the function may only touch its own prefix.
+    health.fn.addToRolePolicy(
+      new PolicyStatement({
+        actions: ['ssm:GetParameter', 'ssm:PutParameter', 'ssm:DeleteParameter'],
+        resources: [this.formatArn({ service: 'ssm', resource: 'parameter', resourceName: 'gravity/health/*' })],
+      }),
+    );
+    // Keep data fresh without anyone opening the site. Also finishes any history import that was left half-done.
+    new Rule(this, 'HealthSync', { schedule: Schedule.rate(Duration.hours(4)), targets: [new LambdaFunction(health.fn)] });
+
     new GravityService(this, 'Journal', {
       name: 'journal',
       api,
       authorizer,
       allowlist,
-      readTables: [{ table: core.table, envName: 'CORE_TABLE' }],
+      readTables: [
+        { table: core.table, envName: 'CORE_TABLE' },
+        { table: health.table, envName: 'HEALTH_TABLE' },
+      ],
     });
 
     // ---- Publish the SPA + runtime config ----------------------------------------------------------------------

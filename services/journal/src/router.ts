@@ -3,6 +3,7 @@ import {
   HttpError,
   canManage,
   canReadDay,
+  computeBodySignals,
   computeInsights,
   createRouter,
   dateStr,
@@ -17,6 +18,7 @@ import {
   type Day,
   type DaySummary,
   type Db,
+  type HealthDay,
   type Profile,
   type Route,
   type SharedDaySummary,
@@ -29,6 +31,8 @@ export interface JournalDeps {
   table: string;
   /** Read-only access to the core table, used to resolve profile ownership. */
   coreTable: string;
+  /** Read-only access to the health table, for the body strip and body signals. Absent = health is not wired up. */
+  healthTable?: string;
   allowlist: () => Promise<string[]>;
   now?: () => Date;
 }
@@ -46,7 +50,7 @@ const toDay = (it: Record<string, unknown>): Day => {
   return rest as unknown as Day;
 };
 
-export function buildJournalRouter({ db, table, coreTable, allowlist, now = () => new Date() }: JournalDeps) {
+export function buildJournalRouter({ db, table, coreTable, healthTable, allowlist, now = () => new Date() }: JournalDeps) {
   const profile = async (id: string) => {
     const it = await db.get(coreTable, `PROFILE#${id}`, 'META');
     if (!it) throw new HttpError(404, 'Profile not found');
@@ -62,7 +66,37 @@ export function buildJournalRouter({ db, table, coreTable, allowlist, now = () =
   /** Foods the person removed from their history. They stay out of suggestions until logged again on purpose. */
   const hiddenFoods = async (pid: string) => new Set((await db.query(table, `PROFILE#${pid}`, 'HIDDENFOOD#')).map((i) => String(i.food)));
 
+  const healthDays = async (pid: string): Promise<HealthDay[]> =>
+    healthTable
+      ? (await db.query(healthTable, `PROFILE#${pid}`, 'DAY#')).map(({ pk: _pk, sk: _sk, syncedAt: _s, ...rest }) => rest as unknown as HealthDay)
+      : [];
+
   const routes: Route[] = [
+    {
+      // Health data is private to the people who manage a profile: shared journal days never carry it.
+      method: 'GET',
+      path: '/profiles/:pid/body/:date',
+      handler: async ({ user, params }) => {
+        const date = parse(dateStr, params.date);
+        const p = await manage(params.pid!, user.sub);
+        if (!healthTable) return null;
+        const it = await db.get(healthTable, `PROFILE#${p.id}`, `DAY#${date}`);
+        if (!it) return null;
+        const { pk: _pk, sk: _sk, syncedAt: _s, ...rest } = it;
+        return rest as unknown as HealthDay;
+      },
+    },
+    {
+      method: 'GET',
+      path: '/profiles/:pid/body-signals',
+      handler: async ({ user, params, query }) => {
+        const p = await manage(params.pid!, user.sub);
+        const to = query.to ? parse(dateStr, query.to) : today();
+        const from = query.from ? parse(dateStr, query.from) : addDays(to, -180);
+        const inRange = <T extends { date: string }>(xs: T[]) => xs.filter((d) => d.date >= from && d.date <= to);
+        return computeBodySignals(inRange(await allDays(p.id)), inRange(await healthDays(p.id)));
+      },
+    },
     {
       method: 'GET',
       path: '/profiles/:pid/days',

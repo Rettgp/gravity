@@ -6,9 +6,11 @@ import {
   generateDemoDays,
   MEAL_KEYS,
   normalizeFood,
+  type BodySignals,
   type Day,
   type DayInput,
   type DaySummary,
+  type HealthDay,
   type Insights,
   type SharedDaySummary,
 } from '@gravity/shared';
@@ -28,6 +30,10 @@ export interface JournalApi {
   /** Forget a food on every day (fixes typos that live on in suggestions). */
   removeFood(pid: string, food: string): Promise<{ daysChanged: number }>;
   insights(pid: string): Promise<Insights>;
+  /** That day's body numbers (sleep, heart rate...), or null. Private to the profile's managers. */
+  body(pid: string, date: string): Promise<HealthDay | null>;
+  /** How unwell days (and the day before) and foods relate to the body numbers. */
+  bodySignals(pid: string): Promise<BodySignals>;
   shared(month: string): Promise<SharedDaySummary[]>;
 }
 
@@ -48,6 +54,8 @@ export function useHttpJournalApi(): JournalApi {
       foods: (pid) => f('/api/journal/profiles/' + pid + '/foods'),
       removeFood: (pid, food) => f('/api/journal/profiles/' + pid + '/foods/remove', { method: 'POST', body: { food } }),
       insights: (pid) => f('/api/journal/profiles/' + pid + '/insights'),
+      body: (pid, date) => f('/api/journal/profiles/' + pid + '/body/' + date),
+      bodySignals: (pid) => f('/api/journal/profiles/' + pid + '/body-signals'),
       shared: (month) => f('/api/journal/shared?month=' + month),
     }),
     [f],
@@ -101,6 +109,12 @@ export function createDemoApi(today: string): JournalApi {
     },
     async insights() {
       return computeInsights([...days.values()]);
+    },
+    async body() {
+      return null;
+    },
+    async bodySignals() {
+      return { coverage: { healthDays: 0, unwellDaysWithData: 0 }, signals: [], foods: [] };
     },
     async shared() {
       return [];

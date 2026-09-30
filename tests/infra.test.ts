@@ -12,6 +12,7 @@ beforeAll(() => {
     allowedEmails: 'mom@example.com,dad@example.com',
     googleClientId: 'test-client-id',
     googleClientSecret: 'test-secret',
+    googleHealthClientId: 'health-client-id.apps.googleusercontent.com',
   });
   t = Template.fromStack(stack);
 }, 60_000);
@@ -75,13 +76,13 @@ describe('infra: nobody but the family', () => {
 
   it('never deletes family data with the stack, and stays pay-per-request', () => {
     const tables = t.findResources('AWS::DynamoDB::Table');
-    expect(Object.keys(tables)).toHaveLength(2);
+    expect(Object.keys(tables)).toHaveLength(3);
     for (const r of Object.values(tables) as any[]) {
       expect(r.DeletionPolicy).toBe('Retain');
       expect(r.Properties.BillingMode).toBe('PAY_PER_REQUEST');
       expect(r.Properties.PointInTimeRecoverySpecification.PointInTimeRecoveryEnabled).toBe(true);
     }
-    expect(Object.values(tables).map((r: any) => r.Properties.TableName).sort()).toEqual(['gravity-core', 'gravity-journal']);
+    expect(Object.values(tables).map((r: any) => r.Properties.TableName).sort()).toEqual(['gravity-core', 'gravity-health', 'gravity-journal']);
   });
 
   it('runs cheap arm64 Node 22 Lambdas and nothing that bills by the hour', () => {
@@ -96,10 +97,29 @@ describe('infra: nobody but the family', () => {
 
   it('lets the journal read (only read) the core table', () => {
     const journalEnv = Object.values(t.findResources('AWS::Lambda::Function')).map((f: any) => f.Properties.Environment?.Variables ?? {});
-    expect(journalEnv.some((e: any) => 'CORE_TABLE' in e && 'TABLE' in e)).toBe(true);
+    expect(journalEnv.some((e: any) => 'CORE_TABLE' in e && 'HEALTH_TABLE' in e && 'TABLE' in e)).toBe(true);
   });
 
   it('seeds the SSM allowlist', () => {
     t.hasResourceProperties('AWS::SSM::Parameter', { Name: '/gravity/allowed-emails', Value: 'mom@example.com,dad@example.com' });
+  });
+
+  it('syncs health data on a schedule, without a VPC, NAT or Secrets Manager', () => {
+    t.hasResourceProperties('AWS::Events::Rule', { ScheduleExpression: 'rate(4 hours)' });
+    t.resourceCountIs('AWS::Events::Rule', 1);
+  });
+
+  it('gives the health function only its own SSM prefix, and never stores the Google health secret in the template', () => {
+    const policies = Object.values(t.findResources('AWS::IAM::Policy')) as any[];
+    const ssmWrites = policies.flatMap((p) => p.Properties.PolicyDocument.Statement).filter((st: any) => ([] as string[]).concat(st.Action).includes('ssm:PutParameter'));
+    expect(ssmWrites).toHaveLength(1);
+    expect(JSON.stringify(ssmWrites[0].Resource)).toContain('parameter/gravity/health/*');
+    expect(JSON.stringify(t.toJSON())).not.toContain('GOCSPX');
+    const env = Object.values(t.findResources('AWS::Lambda::Function')).map((f: any) => f.Properties.Environment?.Variables ?? {});
+    const healthEnv = env.find((e: any) => 'GOOGLE_HEALTH_SECRET_PARAM' in e) as any;
+    expect(healthEnv.GOOGLE_HEALTH_CLIENT_ID).toBe('health-client-id.apps.googleusercontent.com');
+    expect(healthEnv.GOOGLE_HEALTH_SECRET_PARAM).toBe('/gravity/health/google-client-secret');
+    // The Google return address may only be this site or local development.
+    expect(JSON.stringify(healthEnv.HEALTH_REDIRECT_URIS)).toContain('/app/health/callback');
   });
 });
