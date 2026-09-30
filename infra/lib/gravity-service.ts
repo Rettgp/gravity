@@ -19,6 +19,10 @@ export interface GravityServiceProps {
   allowlist: IStringParameter;
   /** Give the function read-only access to another service's table (e.g. journal reads profiles from core). */
   readTables?: { table: Table; envName: string }[];
+  /** Extra environment variables for the function. */
+  environment?: Record<string, string>;
+  /** Defaults to 10s. API Gateway itself gives up after 29s. */
+  timeout?: Duration;
 }
 
 /**
@@ -31,7 +35,7 @@ export class GravityService extends Construct {
 
   constructor(scope: Construct, id: string, props: GravityServiceProps) {
     super(scope, id);
-    const { name, api, authorizer, allowlist, readTables = [] } = props;
+    const { name, api, authorizer, allowlist, readTables = [], environment = {}, timeout = Duration.seconds(10) } = props;
 
     this.table = new Table(this, 'Table', {
       tableName: 'gravity-' + name,
@@ -49,9 +53,9 @@ export class GravityService extends Construct {
       runtime: Runtime.NODEJS_22_X,
       architecture: Architecture.ARM_64,
       memorySize: 256,
-      timeout: Duration.seconds(10),
+      timeout,
       logGroup: new LogGroup(this, 'Logs', { retention: RetentionDays.TWO_WEEKS, removalPolicy: RemovalPolicy.DESTROY }),
-      environment: { TABLE: this.table.tableName, ALLOWLIST_PARAM: allowlist.parameterName },
+      environment: { TABLE: this.table.tableName, ALLOWLIST_PARAM: allowlist.parameterName, ...environment },
       bundling: { minify: true, sourceMap: false, target: 'node22' },
     });
     this.table.grantReadWriteData(this.fn);

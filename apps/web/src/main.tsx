@@ -7,6 +7,7 @@ import '@fontsource-variable/sora';
 import './styles/base.css';
 import './styles/app.css';
 import './styles/journal.css';
+import './styles/health.css';
 import './styles/landing.css';
 import { App } from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';

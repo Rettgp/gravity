@@ -5,6 +5,8 @@ import { ApiError } from './lib/api';
 import { useAuth } from './lib/auth';
 import { useMe } from './lib/me';
 import { Dashboard } from './pages/Dashboard';
+import { HealthCallback } from './pages/HealthCallback';
+import { HealthPage } from './pages/HealthPage';
 import { JournalPage } from './pages/JournalPage';
 import { Login } from './pages/Login';
 import { Profiles } from './pages/Profiles';
@@ -70,6 +72,8 @@ export function App() {
         <Route path="/app" element={<Protected />}>
           <Route index element={<Dashboard />} />
           <Route path="journal" element={<JournalPage />} />
+          <Route path="health" element={<HealthPage />} />
+          <Route path="health/callback" element={<HealthCallback />} />
           <Route path="profiles" element={<Profiles />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -24,5 +24,6 @@ new GravityStack(app, 'gravity', {
   allowedEmails: need('ALLOWED_EMAILS'),
   googleClientId: need('GOOGLE_CLIENT_ID'),
   googleClientSecret: need('GOOGLE_CLIENT_SECRET'),
+  googleHealthClientId: process.env.GOOGLE_HEALTH_CLIENT_ID || undefined,
   webDist: path.resolve(__dirname, '..', '..', 'apps', 'web', 'dist'),
 });
