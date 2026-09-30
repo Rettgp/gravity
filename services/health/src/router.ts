@@ -76,6 +76,8 @@ export function buildHealthRouter(deps: HealthDeps) {
       handler: async ({ user, params, body }) => {
         const p = await manage(params.pid!, user.sub);
         if (!google.configured) throw new HttpError(503, 'Google Health is not set up on this server yet');
+        const problem = await google.ready();
+        if (problem) throw new HttpError(503, problem);
         const { redirectUri } = parse(z.object({ redirectUri: z.string().url() }), body);
         if (!redirectOk(redirectUri)) throw new HttpError(400, 'That return address is not allowed');
         const state = randomUUID();

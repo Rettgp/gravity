@@ -41,6 +41,11 @@ export class FakeGoogle implements GoogleHealth {
   /** Tests flip this to simulate Google revoking access. */
   revoked = false;
   revokedTokens: string[] = [];
+  /** Tests set this to simulate unfinished server setup. */
+  problem: string | undefined;
+  async ready() {
+    return this.problem;
+  }
   /** Tests set this to simulate one data type failing. */
   errors: string[] = [];
 

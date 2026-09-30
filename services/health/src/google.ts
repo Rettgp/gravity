@@ -28,6 +28,8 @@ export interface FetchResult {
 export interface GoogleHealth {
   /** False when no OAuth client is set up on the server. */
   configured: boolean;
+  /** A human-readable reason the connection cannot work yet (e.g. the client secret is missing), or undefined when ready. */
+  ready(): Promise<string | undefined>;
   authUrl(redirectUri: string, state: string): string;
   exchange(code: string, redirectUri: string): Promise<{ refreshToken: string }>;
   accessToken(refreshToken: string): Promise<string>;
@@ -58,6 +60,17 @@ export class RealGoogle implements GoogleHealth {
   private clientId?: string;
   get configured() {
     return !!this.clientId;
+  }
+
+  /** Checked before sending anyone to Google, so unfinished setup fails here instead of after they have consented. */
+  async ready() {
+    try {
+      await this.o.clientSecret();
+      return undefined;
+    } catch (e) {
+      console.error('google client secret unavailable', e);
+      return 'Setup is unfinished: the Google client secret has not been stored on the server yet (see the README, "Health data", step 2).';
+    }
   }
 
   authUrl(redirectUri: string, state: string) {

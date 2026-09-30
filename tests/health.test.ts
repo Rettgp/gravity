@@ -196,6 +196,14 @@ describe('health: connecting Google', () => {
     expect(await app.tokens.get(momPid)).toBeUndefined();
   });
 
+  it('refuses to send anyone to Google when the server setup is unfinished (e.g. client secret missing)', async () => {
+    app.google.problem = 'Setup is unfinished: the Google client secret has not been stored on the server yet';
+    const r = await app.health('mom', 'POST', `/profiles/${momPid}/link/start`, { redirectUri: RETURN });
+    expect(r.status).toBe(503);
+    expect((r.body as any).error).toContain('client secret');
+    expect(await app.db.query('health', 'OAUTHSTATE#')).toEqual([]);
+  });
+
   it('reports "not set up" instead of failing when the server has no Google client', async () => {
     app.google.configured = false;
     expect((await link('mom', momPid)).body).toMatchObject({ configured: false });
@@ -364,5 +372,9 @@ describe('health: Google client configuration', () => {
     expect(url.searchParams.get('client_id')).toBe('123-abc.apps.googleusercontent.com');
     expect(g.configured).toBe(true);
     expect(new RealGoogle({ clientId: '   ', clientSecret: async () => 's' }).configured).toBe(false);
+    // A missing SSM secret is reported as unfinished setup, not as a Google rejection.
+    const noSecret = new RealGoogle({ clientId: 'x', clientSecret: async () => { throw new Error('ParameterNotFound'); } });
+    expect(await noSecret.ready()).toContain('client secret');
+    expect(await g.ready()).toBeUndefined();
   });
 });

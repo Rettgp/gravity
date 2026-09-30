@@ -61,6 +61,7 @@ One-time setup, after the normal deploy above:
    ```bash
    aws ssm put-parameter --region us-east-2 --name /gravity/health/google-client-secret --type SecureString --value 'GOCSPX-...'
    ```
+   Run it in PowerShell or cmd. Git Bash on Windows rewrites `/gravity/...` into a file path and stores the wrong name (use `MSYS_NO_PATHCONV=1 aws ...` there). The secret must be the one for the *health* client, not the sign-in client. Check it landed with `aws ssm describe-parameters --region us-east-2 --query "Parameters[].Name"`.
 3. Put the client **ID** in `.env.local` as `GOOGLE_HEALTH_CLIENT_ID`, then `npm run deploy`. Without it the Health page says "not set up" and nothing can be connected.
 4. Each person opens **Health** and taps *Connect Google Health*. The first year of history imports in the background.
 
