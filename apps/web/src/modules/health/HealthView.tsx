@@ -1,64 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { addDays, compareToUsual, seriesFor, type HealthDay, type HealthLink, type HealthMetricKey, type ProfileSummary } from '@gravity/shared';
+import { AnimatePresence } from 'motion/react';
+import { addDays, compareToUsual, seriesFor, type HealthDay, type HealthLink, type ProfileSummary } from '@gravity/shared';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Icon } from '../../components/Icon';
 import { localToday } from '../../lib/dates';
 import { useHealthApi } from './api';
 import { HeadsUp } from './HeadsUp';
+import { METRICS, dayName, show, showDiff, type MetricDef } from './metrics';
+import { MetricDetail } from './MetricDetail';
 import { Sparkline } from './Sparkline';
 
 const WINDOW = 30;
-const fmtDuration = (min: number) => `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`;
-/** Short form for differences: 25m, 1h 05m. */
-const fmtShort = (min: number) => (min < 60 ? `${Math.round(min)}m` : fmtDuration(min));
-
-interface MetricDef {
-  key: HealthMetricKey;
-  label: string;
-  unit?: string;
-  digits?: number;
-  format?: (v: number) => string;
-  /** How a difference is written (defaults to `format`). */
-  formatDiff?: (v: number) => string;
-  /** Extra line under the value, from the same day. */
-  detail?: (d: HealthDay) => string | undefined;
-}
-const METRICS: MetricDef[] = [
-  { key: 'restingHr', label: 'Resting heart rate', unit: 'bpm' },
-  { key: 'hrv', label: 'Heart rate variability', unit: 'ms', digits: 0 },
-  {
-    key: 'sleepMinutes',
-    label: 'Sleep',
-    format: fmtDuration,
-    formatDiff: fmtShort,
-    detail: (d) =>
-      d.sleepDeepMin !== undefined && d.sleepRemMin !== undefined
-        ? `Deep ${fmtDuration(d.sleepDeepMin)} · REM ${fmtDuration(d.sleepRemMin)}`
-        : d.bedtime && d.wakeTime
-          ? `${d.bedtime} to ${d.wakeTime}`
-          : undefined,
-  },
-  { key: 'steps', label: 'Steps', format: (v) => Math.round(v).toLocaleString() },
-  { key: 'spo2', label: 'Blood oxygen', unit: '%', digits: 1 },
-  { key: 'skinTempC', label: 'Skin temperature', unit: '°C', digits: 1 },
-  { key: 'breathing', label: 'Breathing rate', unit: '/min', digits: 1 },
-];
-
-const show = (m: MetricDef, v: number) => (m.format ? m.format(v) : v.toFixed(m.digits ?? 0));
-const dayName = (date: string, today: string) =>
-  date === today
-    ? 'Today'
-    : date === addDays(today, -1)
-      ? 'Yesterday'
-      : new Date(date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 const ago = (iso?: string) => {
   if (!iso) return 'never';
   const min = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
   return min < 1 ? 'just now' : min < 60 ? `${min} min ago` : min < 1440 ? `${Math.round(min / 60)} h ago` : `${Math.round(min / 1440)} d ago`;
 };
 
-function Tile({ def, days, today }: { def: MetricDef; days: HealthDay[]; today: string }) {
+function Tile({ def, days, today, onOpen }: { def: MetricDef; days: HealthDay[]; today: string; onOpen: (opener: HTMLElement | null) => void }) {
+  const btn = useRef<HTMLButtonElement>(null);
   const from = addDays(today, -(WINDOW - 1));
   const values = useMemo(() => seriesFor(days, def.key, from, today), [days, def.key, from, today]);
   const [hover, setHover] = useState<number | null>(null);
@@ -75,8 +36,21 @@ function Tile({ def, days, today }: { def: MetricDef; days: HealthDay[]; today: 
   const diffText = diff === undefined ? undefined : `${diff > 0 ? '+' : '−'}${def.formatDiff ? def.formatDiff(Math.abs(diff)) : show(def, Math.abs(diff))}`;
 
   return (
-    <li className="card hl-tile">
-      <h3>{def.label}</h3>
+    <li className="card hl-tile hl-tile-click" onClick={() => onOpen(btn.current)}>
+      <h3>
+        <button
+          ref={btn}
+          className="hl-tile-btn"
+          aria-haspopup="dialog"
+          aria-label={`Open ${def.label} details`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen(btn.current);
+          }}
+        >
+          {def.label} <Icon name="right" size={14} />
+        </button>
+      </h3>
       {value === undefined || !date ? (
         <p className="hl-none muted">No data in the last {WINDOW} days</p>
       ) : (
@@ -158,6 +132,8 @@ export function HealthView({ profiles, defaultProfileId, justConnected }: Props)
   const [error, setError] = useState('');
   const [confirm, setConfirm] = useState(false);
   const tried = useRef(new Set<string>());
+  const [open, setOpen] = useState<MetricDef | null>(null);
+  const opener = useRef<HTMLElement | null>(null);
 
   const linkQ = useQuery({ queryKey: ['health', 'link', pid], queryFn: () => api.link(pid) });
   const link = linkQ.data;
@@ -167,6 +143,16 @@ export function HealthView({ profiles, defaultProfileId, justConnected }: Props)
     enabled: !!link?.connected,
   });
   const days = daysQ.data ?? [];
+  // The detail view can show a whole year; load it only when someone opens a card.
+  const yearQ = useQuery({
+    queryKey: ['health', 'days', pid, 'year'],
+    queryFn: () => api.days(pid, addDays(today, -364), today),
+    enabled: !!open && !!link?.connected,
+  });
+  const closeDetail = useCallback(() => {
+    setOpen(null);
+    requestAnimationFrame(() => opener.current?.focus());
+  }, []);
 
   const runSync = useCallback(async () => {
     setBusy(true);
@@ -230,7 +216,7 @@ export function HealthView({ profiles, defaultProfileId, justConnected }: Props)
       {profiles.length > 1 && (
         <div className="jr-chips" role="group" aria-label="Whose health">
           {profiles.map((p) => (
-            <button key={p.id} className="chip" aria-pressed={pid === p.id} onClick={() => setPid(p.id)}>
+            <button key={p.id} className="chip" aria-pressed={pid === p.id} onClick={() => (setOpen(null), setPid(p.id))}>
               <span aria-hidden="true">{p.emoji}</span> {p.name}
             </button>
           ))}
@@ -302,7 +288,16 @@ export function HealthView({ profiles, defaultProfileId, justConnected }: Props)
               <HeadsUp days={days} />
               <ul className="hl-grid" aria-label="Trends">
                 {METRICS.map((m) => (
-                  <Tile key={m.key} def={m} days={days} today={today} />
+                  <Tile
+                    key={m.key}
+                    def={m}
+                    days={days}
+                    today={today}
+                    onOpen={(el) => {
+                      opener.current = el;
+                      setOpen(m);
+                    }}
+                  />
                 ))}
               </ul>
               <DataTable days={days} today={today} />
@@ -316,6 +311,10 @@ export function HealthView({ profiles, defaultProfileId, justConnected }: Props)
           {error}
         </p>
       )}
+
+      <AnimatePresence>
+        {open && link?.connected && <MetricDetail key={open.key} def={open} pid={pid} days={yearQ.data ?? days} loadingYear={yearQ.isLoading} onClose={closeDetail} />}
+      </AnimatePresence>
 
       {confirm && (
         <ConfirmDialog
