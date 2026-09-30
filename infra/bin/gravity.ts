@@ -8,7 +8,7 @@ const envFile = path.resolve(__dirname, '..', '..', '.env.local');
 if (fs.existsSync(envFile)) {
   for (const line of fs.readFileSync(envFile, 'utf8').split(/\r?\n/)) {
     const m = /^\s*([A-Z0-9_]+)\s*=\s*(.*)\s*$/.exec(line);
-    if (m && process.env[m[1]!] === undefined) process.env[m[1]!] = m[2]!.replace(/^["']|["']$/g, '');
+    if (m && process.env[m[1]!] === undefined) process.env[m[1]!] = m[2]!.trim().replace(/^["']|["']$/g, '').trim();
   }
 }
 
@@ -24,6 +24,6 @@ new GravityStack(app, 'gravity', {
   allowedEmails: need('ALLOWED_EMAILS'),
   googleClientId: need('GOOGLE_CLIENT_ID'),
   googleClientSecret: need('GOOGLE_CLIENT_SECRET'),
-  googleHealthClientId: process.env.GOOGLE_HEALTH_CLIENT_ID || undefined,
+  googleHealthClientId: process.env.GOOGLE_HEALTH_CLIENT_ID?.trim() || undefined,
   webDist: path.resolve(__dirname, '..', '..', 'apps', 'web', 'dist'),
 });

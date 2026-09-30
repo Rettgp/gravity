@@ -228,7 +228,7 @@ export class GravityStack extends Stack {
       environment: {
         HEALTH_REDIRECT_URIS: [siteUrl, 'http://localhost:5174'].map((o) => o + '/app/health/callback').join(','),
         GOOGLE_HEALTH_SECRET_PARAM: HEALTH_SECRET_PARAM,
-        ...(props.googleHealthClientId ? { GOOGLE_HEALTH_CLIENT_ID: props.googleHealthClientId } : {}),
+        ...(props.googleHealthClientId?.trim() ? { GOOGLE_HEALTH_CLIENT_ID: props.googleHealthClientId.trim() } : {}),
       },
     });
     // Refresh tokens live in SSM SecureStrings (free, unlike Secrets Manager); the function may only touch its own prefix.

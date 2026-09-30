@@ -52,14 +52,17 @@ export class RealGoogle implements GoogleHealth {
   private http: typeof fetch;
   constructor(private o: RealGoogleOptions) {
     this.http = o.fetch ?? fetch;
+    // A stray space or newline from configuration makes Google answer "invalid_client", so never trust the raw value.
+    this.clientId = o.clientId?.trim() || undefined;
   }
+  private clientId?: string;
   get configured() {
-    return !!this.o.clientId;
+    return !!this.clientId;
   }
 
   authUrl(redirectUri: string, state: string) {
     const q = new URLSearchParams({
-      client_id: this.o.clientId ?? '',
+      client_id: this.clientId ?? '',
       redirect_uri: redirectUri,
       response_type: 'code',
       scope: SCOPES.join(' '),
@@ -75,7 +78,7 @@ export class RealGoogle implements GoogleHealth {
     const res = await this.http('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ client_id: this.o.clientId ?? '', client_secret: await this.o.clientSecret(), ...params }),
+      body: new URLSearchParams({ client_id: this.clientId ?? '', client_secret: await this.o.clientSecret(), ...params }),
     });
     const json = (await res.json().catch(() => ({}))) as { access_token?: string; refresh_token?: string; error?: string; error_description?: string };
     if (!res.ok) {

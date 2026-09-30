@@ -355,3 +355,14 @@ describe('health: the schedule', () => {
     expect(await app.syncAll()).toEqual({ synced: 1, skipped: 0, failed: 1 });
   });
 });
+
+describe('health: Google client configuration', () => {
+  it('ignores stray whitespace around the client ID (a trailing space caused Google to answer invalid_client)', async () => {
+    const { RealGoogle } = await import('../services/health/src/google');
+    const g = new RealGoogle({ clientId: '  123-abc.apps.googleusercontent.com \n', clientSecret: async () => 's' });
+    const url = new URL(g.authUrl('https://gravity.test/app/health/callback', 'st'));
+    expect(url.searchParams.get('client_id')).toBe('123-abc.apps.googleusercontent.com');
+    expect(g.configured).toBe(true);
+    expect(new RealGoogle({ clientId: '   ', clientSecret: async () => 's' }).configured).toBe(false);
+  });
+});
