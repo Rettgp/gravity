@@ -217,13 +217,6 @@ export class GravityStack extends Stack {
       jwtAudience: [client.userPoolClientId],
     });
     const core = new GravityService(this, 'Core', { name: 'core', api, authorizer, allowlist });
-    new GravityService(this, 'Journal', {
-      name: 'journal',
-      api,
-      authorizer,
-      allowlist,
-      readTables: [{ table: core.table, envName: 'CORE_TABLE' }],
-    });
 
     const health = new GravityService(this, 'Health', {
       name: 'health',
@@ -247,6 +240,17 @@ export class GravityStack extends Stack {
     );
     // Keep data fresh without anyone opening the site. Also finishes any history import that was left half-done.
     new Rule(this, 'HealthSync', { schedule: Schedule.rate(Duration.hours(4)), targets: [new LambdaFunction(health.fn)] });
+
+    new GravityService(this, 'Journal', {
+      name: 'journal',
+      api,
+      authorizer,
+      allowlist,
+      readTables: [
+        { table: core.table, envName: 'CORE_TABLE' },
+        { table: health.table, envName: 'HEALTH_TABLE' },
+      ],
+    });
 
     // ---- Publish the SPA + runtime config ----------------------------------------------------------------------
     const webDist = props.webDist && fs.existsSync(props.webDist) ? props.webDist : path.join(REPO_ROOT, 'infra', 'empty-site');

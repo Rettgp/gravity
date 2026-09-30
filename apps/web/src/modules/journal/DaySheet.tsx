@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Icon } from '../../components/Icon';
 import { dayLabel } from '../../lib/dates';
 import { useJournalApi } from './api';
+import { BodyStrip } from './BodyStrip';
 import { Meals } from './Meals';
 import { Symptoms } from './Symptoms';
 import { useDayDraft } from './useDayDraft';
@@ -86,6 +87,7 @@ export function DaySheet({ pid, date, readOnly, ownerName, onClose }: Props) {
           <p className="muted">Loading...</p>
         ) : (
           <div className="jr-sheet-body">
+            {!readOnly && <BodyStrip pid={pid} date={date} />}
             <div className={'jr-unwell' + (draft.unwell ? ' on' : '')}>
               <div>
                 <strong id="unwell-label">Felt unwell today</strong>

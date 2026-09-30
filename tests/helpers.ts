@@ -18,7 +18,7 @@ export function makeApp(allowed: string[] = FAMILY) {
   const db = new MemoryDb();
   const allowlist = async () => allowed;
   const core = buildCoreRouter({ db, table: 'core', allowlist });
-  const journal = buildJournalRouter({ db, table: 'journal', coreTable: 'core', allowlist, now: () => new Date('2026-09-28T12:00:00Z') });
+  const journal = buildJournalRouter({ db, table: 'journal', coreTable: 'core', healthTable: 'health', allowlist, now: () => new Date('2026-09-28T12:00:00Z') });
   const google = new FakeGoogle();
   const tokens = new MemoryTokens();
   let clock = new Date('2026-09-28T12:00:00Z');

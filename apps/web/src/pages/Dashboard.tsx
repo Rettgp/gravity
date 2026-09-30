@@ -8,6 +8,7 @@ import { useAuth } from '../lib/auth';
 import { localToday, monthOf } from '../lib/dates';
 import { useMe } from '../lib/me';
 import { MODULES } from '../modules/registry';
+import { DashboardHeadsUp } from '../modules/health/HeadsUp';
 import { useHttpJournalApi } from '../modules/journal/api';
 
 const greeting = () => {
@@ -41,6 +42,8 @@ export function Dashboard() {
         <p className="muted">{greeting()}</p>
         <h1>{name || 'Welcome'}</h1>
       </header>
+
+      <DashboardHeadsUp pid={pid} />
 
       <section className="card dash-today" aria-label="Today">
         <div>

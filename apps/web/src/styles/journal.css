@@ -119,3 +119,11 @@
 .jr-opt { justify-content: space-between; gap: 8px; }
 .jr-opt-forget { display: grid; place-items: center; width: 36px; height: 36px; margin-right: -6px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); }
 .jr-opt-forget:hover, .jr-opt-forget:focus-visible { color: var(--unwell); background: var(--unwell-bg); }
+
+/* Body numbers in the day sheet, and body signals in insights */
+.jr-body-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
+.jr-body-list li { display: grid; gap: 2px; padding: 10px 12px; border-radius: 14px; background: var(--surface-2); border: 1px solid var(--border); }
+.jr-body-list span { font-size: 12px; }
+.jr-body-list strong { font-family: var(--font-display); font-size: 17px; }
+.jr-signals { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.jr-signal { line-height: 1.5; }

@@ -5,6 +5,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Icon } from '../../components/Icon';
 import { localToday } from '../../lib/dates';
 import { useHealthApi } from './api';
+import { HeadsUp } from './HeadsUp';
 import { Sparkline } from './Sparkline';
 
 const WINDOW = 30;
@@ -298,6 +299,7 @@ export function HealthView({ profiles, defaultProfileId, justConnected }: Props)
           )}
           {hasAny && (
             <>
+              <HeadsUp days={days} />
               <ul className="hl-grid" aria-label="Trends">
                 {METRICS.map((m) => (
                   <Tile key={m.key} def={m} days={days} today={today} />

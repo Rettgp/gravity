@@ -32,3 +32,9 @@
 .hl-table th, .hl-table td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--border); }
 .hl-table th:first-child, .hl-table td:first-child { text-align: left; }
 .hl-table thead th { color: var(--muted); font-weight: 500; }
+
+.hl-headsup { display: flex; gap: 14px; align-items: flex-start; border-color: color-mix(in oklab, var(--amber) 55%, var(--border)); background: color-mix(in oklab, var(--amber) 9%, var(--surface)); }
+.hl-headsup > svg { flex: none; color: var(--amber); margin-top: 2px; }
+.hl-headsup h2 { font-size: 17px; margin-bottom: 6px; }
+.hl-headsup ul { margin: 0 0 8px; padding-left: 18px; }
+.hl-headsup .btn { margin-top: 8px; }

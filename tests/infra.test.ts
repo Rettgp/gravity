@@ -97,7 +97,7 @@ describe('infra: nobody but the family', () => {
 
   it('lets the journal read (only read) the core table', () => {
     const journalEnv = Object.values(t.findResources('AWS::Lambda::Function')).map((f: any) => f.Properties.Environment?.Variables ?? {});
-    expect(journalEnv.some((e: any) => 'CORE_TABLE' in e && 'TABLE' in e)).toBe(true);
+    expect(journalEnv.some((e: any) => 'CORE_TABLE' in e && 'HEALTH_TABLE' in e && 'TABLE' in e)).toBe(true);
   });
 
   it('seeds the SSM allowlist', () => {
