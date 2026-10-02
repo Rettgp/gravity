@@ -245,3 +245,38 @@ export function seriesFor(days: HealthDay[], key: HealthMetricKey, from: string,
   }
   return out;
 }
+
+// ---- Family steps challenge ------------------------------------------------------------------------------------
+// Health data is private to its owner, with one deliberate exception: each person's monthly step total is shown to the
+// rest of the (allowlisted) family on the podium. Nothing else about a person's health leaves their profile.
+
+export interface StepsEntry {
+  profileId: string;
+  name: string;
+  emoji: string;
+  steps: number;
+  /** 1 for the winner. People with the same total share a rank. */
+  rank: number;
+}
+export interface StepsLeaderboard {
+  /** YYYY-MM */
+  month: string;
+  entries: StepsEntry[];
+  /** Family members who have not connected Google Health yet, so they are not on the podium. */
+  waiting: string[];
+}
+
+/** Sum the steps for one month (YYYY-MM) from a person's stored days. */
+export function monthSteps(days: { date: string; steps?: number }[], month: string): number {
+  let total = 0;
+  for (const d of days) if (d.date.startsWith(month + '-') && typeof d.steps === 'number') total += d.steps;
+  return Math.round(total);
+}
+
+/** Highest first; ties keep the same rank (1, 1, 3) and are ordered by name so the list never jumps around. */
+export function rankSteps(people: { profileId: string; name: string; emoji: string; steps: number }[]): StepsEntry[] {
+  const sorted = [...people].sort((a, b) => b.steps - a.steps || a.name.localeCompare(b.name));
+  const out: StepsEntry[] = [];
+  sorted.forEach((p, i) => out.push({ ...p, rank: i > 0 && out[i - 1]!.steps === p.steps ? out[i - 1]!.rank : i + 1 }));
+  return out;
+}

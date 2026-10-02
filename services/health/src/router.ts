@@ -7,8 +7,13 @@ import {
   createRouter,
   dateStr,
   parse,
+  isAllowed,
+  monthSteps,
+  normalizeEmail,
+  rankSteps,
   type Db,
   type HealthDay,
+  type StepsLeaderboard,
   type Profile,
   type Route,
 } from '@gravity/shared/server';
@@ -148,6 +153,30 @@ export function buildHealthRouter(deps: HealthDeps) {
         if (from < addDays(to, -(MAX_DAYS - 1))) from = addDays(to, -(MAX_DAYS - 1));
         const items = await db.query(table, `PROFILE#${p.id}`, 'DAY#');
         return items.map(toDay).filter((d) => d.date >= from && d.date <= to);
+      },
+    },
+    {
+      // The family steps challenge. This is the one place health data is shared, and it is only a monthly step total
+      // per person, for people who are connected and still on the allowlist (the allowlist is the family).
+      method: 'GET',
+      path: '/steps/leaderboard',
+      handler: async ({ query }): Promise<StepsLeaderboard> => {
+        const month = query.month ? parse(z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), query.month) : now().toISOString().slice(0, 7);
+        const list = await allowlist();
+        const people = [];
+        const connected = new Set<string>();
+        for (const idx of await db.query(table, 'LINKS')) {
+          const pid = String(idx.profileId);
+          const link = await loadLink(pid);
+          if (!link || !isAllowed(link.ownerEmail, list)) continue;
+          const prof = (await db.get(coreTable, `PROFILE#${pid}`, 'META')) as unknown as Profile | undefined;
+          if (!prof) continue;
+          connected.add(normalizeEmail(link.ownerEmail));
+          const days = (await db.query(table, `PROFILE#${pid}`, 'DAY#')).map(toDay);
+          people.push({ profileId: pid, name: prof.name, emoji: prof.emoji, steps: monthSteps(days, month) });
+        }
+        const waiting = list.filter((e) => !connected.has(normalizeEmail(e))).map((e) => normalizeEmail(e).split('@')[0]!);
+        return { month, entries: rankSteps(people), waiting };
       },
     },
     {

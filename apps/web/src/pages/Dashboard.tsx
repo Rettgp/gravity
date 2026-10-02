@@ -9,6 +9,7 @@ import { localToday, monthOf } from '../lib/dates';
 import { useMe } from '../lib/me';
 import { MODULES } from '../modules/registry';
 import { DashboardHeadsUp } from '../modules/health/HeadsUp';
+import { StepsPodium } from '../modules/health/StepsPodium';
 import { useHttpJournalApi } from '../modules/journal/api';
 
 const greeting = () => {
@@ -44,6 +45,8 @@ export function Dashboard() {
       </header>
 
       <DashboardHeadsUp pid={pid} />
+
+      <StepsPodium />
 
       <section className="card dash-today" aria-label="Today">
         <div>

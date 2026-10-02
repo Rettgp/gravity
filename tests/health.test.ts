@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   civilDate,
+  monthSteps,
+  rankSteps,
+  type StepsLeaderboard,
   compareToUsual,
   num,
   parseHrv,
@@ -376,5 +379,49 @@ describe('health: Google client configuration', () => {
     const noSecret = new RealGoogle({ clientId: 'x', clientSecret: async () => { throw new Error('ParameterNotFound'); } });
     expect(await noSecret.ready()).toContain('client secret');
     expect(await g.ready()).toBeUndefined();
+  });
+});
+
+describe('health: family steps challenge', () => {
+  const board = (who: Who | null, month?: string) => app.health(who, 'GET', '/steps/leaderboard', undefined, month ? { month } : {});
+  const total = (d: HealthDay[], month: string) => d.filter((x) => x.date.startsWith(month)).reduce((s, x) => s + (x.steps ?? 0), 0);
+
+  it('ranks connected family members by this month\'s steps and lists who has not joined', async () => {
+    await connect('mom', momPid);
+    await connect('dad', dadPid);
+    await syncUntilDone('mom', momPid);
+    await syncUntilDone('dad', dadPid);
+    const res = await board('mom');
+    expect(res.status).toBe(200);
+    const b = res.body as StepsLeaderboard;
+    expect(b.month).toBe('2026-09');
+    expect(b.entries).toHaveLength(2);
+    const mom = total((await days('mom', momPid, { from: '2026-09-01', to: '2026-09-30' })).body as HealthDay[], '2026-09');
+    const dad = total((await days('dad', dadPid, { from: '2026-09-01', to: '2026-09-30' })).body as HealthDay[], '2026-09');
+    expect(b.entries.find((e) => e.profileId === momPid)!.steps).toBe(mom);
+    expect(b.entries.find((e) => e.profileId === dadPid)!.steps).toBe(dad);
+    expect(b.entries[0]!.steps).toBeGreaterThanOrEqual(b.entries[1]!.steps);
+    expect(b.entries[0]!.rank).toBe(1);
+    expect(b.waiting).toEqual(['teen']);
+    // Only steps are shared: no other health numbers appear in the response.
+    expect(Object.keys(b.entries[0]!).sort()).toEqual(['emoji', 'name', 'profileId', 'rank', 'steps']);
+  });
+
+  it('is only for signed-in, allowlisted people, and rejects a bad month', async () => {
+    await connect('mom', momPid);
+    await connect('dad', dadPid);
+    expect((await board(null)).status).toBe(401);
+    expect((await board('stranger')).status).toBe(403);
+    expect((await board('mom', 'not-a-month')).status).toBe(400);
+  });
+
+  it('shares a rank on a tie', () => {
+    const r = rankSteps([
+      { profileId: 'a', name: 'A', emoji: 'x', steps: 10 },
+      { profileId: 'b', name: 'B', emoji: 'x', steps: 10 },
+      { profileId: 'c', name: 'C', emoji: 'x', steps: 5 },
+    ]);
+    expect(r.map((e) => e.rank)).toEqual([1, 1, 3]);
+    expect(monthSteps([{ date: '2026-09-01', steps: 3 }, { date: '2026-08-31', steps: 9 }, { date: '2026-09-02' }], '2026-09')).toBe(3);
   });
 });

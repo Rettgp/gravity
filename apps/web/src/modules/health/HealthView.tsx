@@ -171,6 +171,7 @@ export function HealthView({ profiles, defaultProfileId, justConnected }: Props)
         const l: HealthLink = await api.sync(pid);
         qc.setQueryData(['health', 'link', pid], l);
         await qc.invalidateQueries({ queryKey: ['health', 'days', pid] });
+        void qc.invalidateQueries({ queryKey: ['health', 'leaderboard'] });
         if (l.backfillDone || !l.connected) break;
       }
     } catch (e) {
@@ -206,6 +207,7 @@ export function HealthView({ profiles, defaultProfileId, justConnected }: Props)
     await api.disconnect(pid);
     tried.current.delete(pid);
     qc.removeQueries({ queryKey: ['health', 'days', pid] });
+    void qc.invalidateQueries({ queryKey: ['health', 'leaderboard'] });
     await qc.invalidateQueries({ queryKey: ['health', 'link', pid] });
     setConfirm(false);
   };
