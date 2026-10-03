@@ -7,6 +7,7 @@ import { useJournalApi } from './api';
 import { Calendar } from './Calendar';
 import { DaySheet } from './DaySheet';
 import { Insights } from './Insights';
+import { Avatar } from '../../components/Avatar';
 
 type Tab = 'calendar' | 'insights' | 'family';
 
@@ -59,12 +60,12 @@ export function JournalView({ profiles, family, defaultProfileId, inline, initia
           <div className="jr-chips" role="group" aria-label="Whose journal">
             {profiles.map((p) => (
               <button key={p.id} className="chip" aria-pressed={pid === p.id} onClick={() => (setPid(p.id), setSelected(null))}>
-                <span aria-hidden="true">{p.emoji}</span> {p.name}
+                <Avatar person={p} size={22} /> {p.name}
               </button>
             ))}
             {others.map((p) => (
               <button key={p.id} className="chip" aria-pressed={pid === p.id} title="View only" onClick={() => (setPid(p.id), setSelected(null))}>
-                <span aria-hidden="true">{p.emoji}</span> {p.name} <span className="jr-viewonly">view only</span>
+                <Avatar person={p} size={22} /> {p.name} <span className="jr-viewonly">view only</span>
               </button>
             ))}
           </div>
@@ -99,7 +100,7 @@ export function JournalView({ profiles, family, defaultProfileId, inline, initia
                   return (
                     <li key={s.profileId + s.date}>
                       <button className="jr-feed-row" onClick={() => setSelected({ pid: s.profileId, date: s.date, readOnly: true })}>
-                        <span aria-hidden="true">{p?.emoji}</span>
+                        <Avatar person={p} size={26} />
                         <strong>{p?.name ?? 'Family'}</strong>
                         <span className="muted">{s.date}</span>
                         <span className={s.unwell ? 'jr-coral' : 'muted'}>{s.unwell ? 'Felt unwell' : 'Logged'}</span>

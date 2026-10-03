@@ -11,6 +11,7 @@ export interface AuthUser {
   sub: string;
   email: string;
   name?: string;
+  picture?: string;
 }
 export interface Ctx {
   user: AuthUser;

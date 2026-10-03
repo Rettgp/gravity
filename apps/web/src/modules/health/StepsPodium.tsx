@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { StepsEntry } from '@gravity/shared';
 import { localToday } from '../../lib/dates';
 import { useHealthApi } from './api';
+import { Avatar } from '../../components/Avatar';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const nf = new Intl.NumberFormat();
@@ -34,7 +35,7 @@ export function StepsPodium() {
             {placed(data.entries).map((e) => (
               <li key={e.profileId} className={'hl-pod hl-pod-' + Math.min(e.rank, 3)} style={{ ['--h' as string]: top ? Math.max(0.28, e.steps / top) : 0.28 }}>
                 <span className="hl-pod-name">
-                  <span aria-hidden="true">{e.emoji}</span> {e.name}
+                  <Avatar person={e} size={22} /> {e.name}
                 </span>
                 <span className="hl-pod-steps">{nf.format(e.steps)}</span>
                 <span className="hl-pod-block" aria-hidden="true">

@@ -11,6 +11,7 @@ import { HeadsUp } from './HeadsUp';
 import { dayName, metricsFor, show, toDisplayDays, type MetricDef } from './metrics';
 import { MetricDetail } from './MetricDetail';
 import { Sparkline } from './Sparkline';
+import { Avatar } from '../../components/Avatar';
 
 const WINDOW = 30;
 const NO_DAYS: HealthDay[] = [];
@@ -227,7 +228,7 @@ export function HealthView({ profiles, defaultProfileId, justConnected }: Props)
         <div className="jr-chips" role="group" aria-label="Whose health">
           {profiles.map((p) => (
             <button key={p.id} className="chip" aria-pressed={pid === p.id} onClick={() => (setOpenKey(null), setPid(p.id))}>
-              <span aria-hidden="true">{p.emoji}</span> {p.name}
+              <Avatar person={p} size={22} /> {p.name}
             </button>
           ))}
         </div>

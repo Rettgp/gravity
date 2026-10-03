@@ -8,6 +8,7 @@ import { localToday } from '../../lib/dates';
 import { useJournalApi } from './api';
 import { GlimmerLightbox } from './GlimmerLightbox';
 import { GlimmerPicture } from './GlimmerThumb';
+import { Avatar } from '../../components/Avatar';
 
 const SEEN_KEY = 'gravity.glimmers.seen';
 const readSeen = () => {
@@ -79,9 +80,7 @@ export function GlimmerFeed({ family }: { family: ProfileSummary[] }) {
                   <span className="gl-scrim">
                     {g.caption && <span className="gl-text">{g.caption}</span>}
                     <span className="gl-by">
-                      <span className="avatar gl-avatar" style={{ background: p?.color }} aria-hidden="true">
-                        {p?.emoji}
-                      </span>
+                      <Avatar person={p} size={24} />
                       <span>
                         {p?.name ?? 'Family'} · {whenLabel(g.date, today)}
                       </span>

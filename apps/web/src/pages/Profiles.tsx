@@ -7,8 +7,8 @@ import { useFetcher } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { useMe } from '../lib/me';
 import { useTheme, type ThemeMode } from '../lib/theme';
+import { Avatar } from '../components/Avatar';
 
-const EMOJI = ['\u{1F642}', '\u{1F9D2}', '\u{1F467}', '\u{1F466}', '\u{1F475}', '\u{1F474}', '\u{1F436}', '\u{1F431}'];
 const COLORS = ['#2c95c8', '#7c5cf0', '#2fb67c', '#f5a524', '#f0605d', '#3cc8e6'];
 
 export function Profiles() {
@@ -18,7 +18,6 @@ export function Profiles() {
   const { user, signOut } = useAuth();
   const { mode, setMode } = useTheme();
   const [name, setName] = useState('');
-  const [emoji, setEmoji] = useState(EMOJI[1]!);
   const [color, setColor] = useState(COLORS[1]!);
   const [msg, setMsg] = useState('');
   const [deleting, setDeleting] = useState<Profile | null>(null);
@@ -26,7 +25,7 @@ export function Profiles() {
   const refresh = () => qc.invalidateQueries({ queryKey: ['me'] });
   const fail = (e: Error) => setMsg(e.message);
   const create = useMutation({
-    mutationFn: () => f('/api/core/profiles', { method: 'POST', body: { name, emoji, color, shareByDefault: false } }),
+    mutationFn: () => f('/api/core/profiles', { method: 'POST', body: { name, color, shareByDefault: false } }),
     onSuccess: () => (setName(''), setMsg(''), refresh()),
     onError: fail,
   });
@@ -53,7 +52,7 @@ export function Profiles() {
         {me.data?.profiles.map((p) => (
           <article key={p.id} className="card profile" data-profile={p.name}>
             <div className="profile-head">
-              <span className="avatar" style={{ background: p.color }} aria-hidden="true">{p.emoji}</span>
+              <Avatar person={p} size={48} />
               <div>
                 <h2>{p.name}</h2>
                 <p className="muted">{p.kind === 'self' ? 'Your journal' : 'Managed by ' + p.managers.length + (p.managers.length === 1 ? ' adult' : ' adults')}</p>
@@ -104,11 +103,6 @@ export function Profiles() {
           Name
           <input className="input" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} placeholder="Junior" />
         </label>
-        <div className="jr-chips" role="radiogroup" aria-label="Avatar">
-          {EMOJI.map((e) => (
-            <button key={e} role="radio" aria-checked={emoji === e} className="chip" aria-pressed={emoji === e} onClick={() => setEmoji(e)}>{e}</button>
-          ))}
-        </div>
         <div className="jr-chips" role="radiogroup" aria-label="Color">
           {COLORS.map((c) => (
             <button key={c} role="radio" aria-checked={color === c} aria-label={'Color ' + c} className={'swatch' + (color === c ? ' on' : '')} style={{ background: c }} onClick={() => setColor(c)} />

@@ -173,7 +173,7 @@ export function buildHealthRouter(deps: HealthDeps) {
           if (!prof) continue;
           connected.add(normalizeEmail(link.ownerEmail));
           const days = (await db.query(table, `PROFILE#${pid}`, 'DAY#')).map(toDay);
-          people.push({ profileId: pid, name: prof.name, emoji: prof.emoji, steps: monthSteps(days, month) });
+          people.push({ profileId: pid, name: prof.name, color: prof.color, ...(prof.picture ? { picture: prof.picture } : {}), steps: monthSteps(days, month) });
         }
         const waiting = list.filter((e) => !connected.has(normalizeEmail(e))).map((e) => normalizeEmail(e).split('@')[0]!);
         return { month, entries: rankSteps(people), waiting };

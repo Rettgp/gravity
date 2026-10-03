@@ -10,7 +10,7 @@ beforeEach(async () => {
   momPid = ((await app.core('mom', 'GET', '/me')).body as any).defaultProfileId;
   await app.core('dad', 'GET', '/me');
   await app.core('teen', 'GET', '/me');
-  kidPid = ((await app.core('mom', 'POST', '/profiles', { name: 'Kid', emoji: 'K', color: '#2fb67c', shareByDefault: false })).body as any).id;
+  kidPid = ((await app.core('mom', 'POST', '/profiles', { name: 'Kid', color: '#2fb67c', shareByDefault: false })).body as any).id;
 });
 
 const put = (who: Who, pid: string, date: string, body: unknown) => app.journal(who, 'PUT', '/profiles/' + pid + '/days/' + date, body);

@@ -27,7 +27,6 @@ export const dayInput = z.object({
 
 export const profileInput = z.object({
   name: z.string().trim().min(1).max(40),
-  emoji: z.string().trim().min(1).max(8),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/),
   shareByDefault: z.boolean().default(false),
 });
@@ -82,14 +81,15 @@ export interface SharedDaySummary {
 export interface Profile {
   id: string;
   name: string;
-  emoji: string;
   color: string;
+  /** Google profile photo URL, only for a person's own profile when they signed in with Google. Others show their initial. */
+  picture?: string;
   kind: 'self' | 'managed';
   ownerSub: string;
   managers: string[];
   shareByDefault: boolean;
 }
-export type ProfileSummary = Pick<Profile, 'id' | 'name' | 'emoji' | 'color'>;
+export type ProfileSummary = Pick<Profile, 'id' | 'name' | 'color' | 'picture'>;
 export interface Me {
   user: { sub: string; email: string; name?: string };
   defaultProfileId: string;

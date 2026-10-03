@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { makeApp } from './helpers';
+import { FAMILY, makeApp } from './helpers';
 
-const kid = { name: 'Junior', emoji: 'K', color: '#7c5cf0', shareByDefault: false };
+const kid = { name: 'Junior', color: '#7c5cf0', shareByDefault: false };
 
 describe('router gate', () => {
   it('401 without a user, 403 for non-allowlisted, 404 unknown, 405 wrong method', async () => {
@@ -67,5 +67,44 @@ describe('core: me + profiles', () => {
     const id = ((await app.core('mom', 'POST', '/profiles', kid)).body as any).id;
     expect((await app.core('mom', 'DELETE', '/profiles/' + id)).status).toBe(204);
     expect(((await app.core('mom', 'GET', '/me')).body as any).family).toHaveLength(1);
+  });
+});
+
+describe('core: avatars', () => {
+  const PHOTO = 'https://lh3.googleusercontent.com/a/abc123=s96-c';
+  const as = (picture?: string) => ({ sub: 'sub-pat', email: 'pat@example.com', name: 'Pat Smith', picture });
+  const me = (app: ReturnType<typeof makeApp>, picture?: string) =>
+    app.coreAs(as(picture), 'GET', '/me').then((r) => r.body as any);
+
+  it('uses the Google photo for a signed-in person and shows it to the family', async () => {
+    const app = makeApp([...FAMILY, 'pat@example.com']);
+    const first = await me(app, PHOTO);
+    expect(first.profiles[0].picture).toBe(PHOTO);
+    const seenByMom = (await app.core('mom', 'GET', '/me')).body as any;
+    expect(seenByMom.family.find((f: any) => f.name === 'Pat').picture).toBe(PHOTO);
+    expect(seenByMom.family.find((f: any) => f.name === 'Pat')).not.toHaveProperty('emoji');
+  });
+
+  it('follows a changed photo, and drops it if Google stops sending one', async () => {
+    const app = makeApp([...FAMILY, 'pat@example.com']);
+    await me(app, PHOTO);
+    const next = 'https://lh3.googleusercontent.com/a/other=s96-c';
+    expect((await me(app, next)).profiles[0].picture).toBe(next);
+    expect((await me(app)).profiles[0].picture).toBeUndefined();
+  });
+
+  it('never stores a photo from anywhere but Google', async () => {
+    const app = makeApp([...FAMILY, 'pat@example.com']);
+    for (const bad of ['http://lh3.googleusercontent.com/a/x', 'https://evil.example.com/a.png', 'https://googleusercontent.com.evil.io/a', 'javascript:alert(1)'])
+      expect((await me(app, bad)).profiles[0].picture, bad).toBeUndefined();
+  });
+
+  it('people without a Google photo, and managed profiles, have none (they show their initial)', async () => {
+    const app = makeApp();
+    const m = (await app.core('mom', 'GET', '/me')).body as any;
+    expect(m.profiles[0].picture).toBeUndefined();
+    const kidRes = (await app.core('mom', 'POST', '/profiles', kid)).body as any;
+    expect(kidRes.picture).toBeUndefined();
+    expect(kidRes).not.toHaveProperty('emoji');
   });
 });

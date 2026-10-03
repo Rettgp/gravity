@@ -232,7 +232,7 @@ describe('health: privacy', () => {
   });
 
   it('a manager of a child profile can use it; health is never in the shared journal feed', async () => {
-    const kid = ((await app.core('mom', 'POST', '/profiles', { name: 'Kid', emoji: 'K', color: '#2fb67c', shareByDefault: true })).body as any).id;
+    const kid = ((await app.core('mom', 'POST', '/profiles', { name: 'Kid', color: '#2fb67c', shareByDefault: true })).body as any).id;
     expect((await link('mom', kid)).status).toBe(200);
     expect((await link('dad', kid)).status).toBe(404);
     await connect('mom', kid);
@@ -404,7 +404,7 @@ describe('health: family steps challenge', () => {
     expect(b.entries[0]!.rank).toBe(1);
     expect(b.waiting).toEqual(['teen']);
     // Only steps are shared: no other health numbers appear in the response.
-    expect(Object.keys(b.entries[0]!).sort()).toEqual(['emoji', 'name', 'profileId', 'rank', 'steps']);
+    expect(Object.keys(b.entries[0]!).sort()).toEqual(['color', 'name', 'profileId', 'rank', 'steps']);
   });
 
   it('is only for signed-in, allowlisted people, and rejects a bad month', async () => {
@@ -417,9 +417,9 @@ describe('health: family steps challenge', () => {
 
   it('shares a rank on a tie', () => {
     const r = rankSteps([
-      { profileId: 'a', name: 'A', emoji: 'x', steps: 10 },
-      { profileId: 'b', name: 'B', emoji: 'x', steps: 10 },
-      { profileId: 'c', name: 'C', emoji: 'x', steps: 5 },
+      { profileId: 'a', name: 'A', color: '#2c95c8', steps: 10 },
+      { profileId: 'b', name: 'B', color: '#2c95c8', steps: 10 },
+      { profileId: 'c', name: 'C', color: '#2c95c8', steps: 5 },
     ]);
     expect(r.map((e) => e.rank)).toEqual([1, 1, 3]);
     expect(monthSteps([{ date: '2026-09-01', steps: 3 }, { date: '2026-08-31', steps: 9 }, { date: '2026-09-02' }], '2026-09')).toBe(3);

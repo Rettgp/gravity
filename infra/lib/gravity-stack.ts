@@ -110,6 +110,7 @@ export class GravityStack extends Stack {
       attributeMapping: {
         email: ProviderAttribute.GOOGLE_EMAIL,
         emailVerified: ProviderAttribute.other('email_verified'),
+        profilePicture: ProviderAttribute.GOOGLE_PICTURE,
         fullname: ProviderAttribute.GOOGLE_NAME,
       },
     });
@@ -141,7 +142,7 @@ export class GravityStack extends Stack {
             "default-src 'self'",
             "script-src 'self'",
             "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data:",
+            "img-src 'self' data: https://*.googleusercontent.com",
             "font-src 'self'",
             "connect-src 'self' https://*.amazoncognito.com https://cognito-idp." + region + '.amazonaws.com',
             "worker-src 'self'",

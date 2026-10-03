@@ -37,6 +37,8 @@ export function makeApp(allowed: string[] = FAMILY) {
   return {
     db,
     core: (who: Who | null, m: string, p: string, b?: unknown, q?: Record<string, string>) => call(core, who, m, '/api/core' + p, b, q),
+    /** Call the core service as an arbitrary signed-in user (e.g. one carrying a Google profile picture). */
+    coreAs: (user: Req['user'], m: string, p: string, b?: unknown, q: Record<string, string> = {}) => core({ method: m, path: '/api/core' + p, body: b, query: q, user }),
     health: (who: Who | null, m: string, p: string, b?: unknown, q?: Record<string, string>) => call(health as never, who, m, '/api/health' + p, b, q),
     syncAll: () => health.syncAll(),
     google,

@@ -253,7 +253,8 @@ export function seriesFor(days: HealthDay[], key: HealthMetricKey, from: string,
 export interface StepsEntry {
   profileId: string;
   name: string;
-  emoji: string;
+  color: string;
+  picture?: string;
   steps: number;
   /** 1 for the winner. People with the same total share a rank. */
   rank: number;
@@ -274,7 +275,7 @@ export function monthSteps(days: { date: string; steps?: number }[], month: stri
 }
 
 /** Highest first; ties keep the same rank (1, 1, 3) and are ordered by name so the list never jumps around. */
-export function rankSteps(people: { profileId: string; name: string; emoji: string; steps: number }[]): StepsEntry[] {
+export function rankSteps(people: { profileId: string; name: string; color: string; picture?: string; steps: number }[]): StepsEntry[] {
   const sorted = [...people].sort((a, b) => b.steps - a.steps || a.name.localeCompare(b.name));
   const out: StepsEntry[] = [];
   sorted.forEach((p, i) => out.push({ ...p, rank: i > 0 && out[i - 1]!.steps === p.steps ? out[i - 1]!.rank : i + 1 }));

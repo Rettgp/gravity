@@ -13,7 +13,7 @@ import { JournalView } from '../modules/journal/JournalView';
 import { MODULES } from '../modules/registry';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
-const DEMO_PROFILE = { id: 'demo', name: 'Alex', emoji: '\u{1F642}', color: '#2c95c8' };
+const DEMO_PROFILE = { id: 'demo', name: 'Alex', color: '#2c95c8' };
 
 function GoogleG() {
   return (

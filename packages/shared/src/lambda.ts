@@ -38,7 +38,7 @@ export function toLambda(router: Router) {
       body,
       user:
         claims.sub && claims.email && verified
-          ? { sub: String(claims.sub), email: String(claims.email), name: claims.name ? String(claims.name) : undefined }
+          ? { sub: String(claims.sub), email: String(claims.email), name: claims.name ? String(claims.name) : undefined, picture: claims.picture ? String(claims.picture) : undefined }
           : null,
     });
     return {

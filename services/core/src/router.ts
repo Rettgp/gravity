@@ -23,7 +23,9 @@ export interface CoreDeps {
   allowlist: () => Promise<string[]>;
 }
 
-const summary = (p: Profile): ProfileSummary => ({ id: p.id, name: p.name, emoji: p.emoji, color: p.color });
+const summary = (p: Profile): ProfileSummary => ({ id: p.id, name: p.name, color: p.color, ...(p.picture ? { picture: p.picture } : {}) });
+/** Only Google-hosted profile photos are ever stored or shown (nothing arbitrary, nothing over http). */
+const safePicture = (url: string | undefined) => (url && url.length <= 500 && /^https:\/\/[a-z0-9-]+\.googleusercontent\.com\/\S+$/i.test(url) ? url : undefined);
 
 export function buildCoreRouter({ db, table, allowlist }: CoreDeps) {
   const loadProfile = async (id: string) => {
@@ -63,8 +65,8 @@ export function buildCoreRouter({ db, table, allowlist }: CoreDeps) {
           const self: Profile = {
             id,
             name: (user.name ?? email.split('@')[0] ?? 'Me').split(' ')[0]!,
-            emoji: '🙂',
             color: '#2c95c8',
+            ...(safePicture(user.picture) ? { picture: safePicture(user.picture) } : {}),
             kind: 'self',
             ownerSub: user.sub,
             managers: [user.sub],
@@ -74,6 +76,13 @@ export function buildCoreRouter({ db, table, allowlist }: CoreDeps) {
           meta = { pk: `USER#${user.sub}`, sk: 'META', sub: user.sub, email, name: user.name, defaultProfileId: id };
         } else {
           meta = { ...meta, email, name: user.name ?? meta.name };
+          // Keep the person's own avatar in step with their Google photo (it changes when they change it, or on sign-in).
+          const own = (await db.get(table, `PROFILE#${meta.defaultProfileId as string}`, 'META')) as unknown as Profile | undefined;
+          const pic = safePicture(user.picture);
+          if (own && own.kind === 'self' && own.picture !== pic) {
+            const { picture: _old, ...rest } = own;
+            await savePublic({ ...rest, ...(pic ? { picture: pic } : {}) });
+          }
         }
         await db.put(table, meta);
         await db.put(table, { pk: `EMAIL#${email}`, sk: 'META', sub: user.sub });
@@ -82,7 +91,7 @@ export function buildCoreRouter({ db, table, allowlist }: CoreDeps) {
           user: { sub: user.sub, email, name: user.name },
           defaultProfileId: meta.defaultProfileId as string,
           profiles: await myProfiles(user.sub),
-          family: family.map(({ id, name, emoji, color }) => ({ id, name, emoji, color })),
+          family: family.map(({ id, name, color, picture }) => ({ id, name, color, ...(picture ? { picture } : {}) })),
         };
         return me;
       },

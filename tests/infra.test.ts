@@ -58,6 +58,17 @@ describe('infra: nobody but the family', () => {
     });
   });
 
+  it('pulls the Google profile picture into Cognito and lets the page show Google-hosted images only', () => {
+    t.hasResourceProperties('AWS::Cognito::UserPoolIdentityProvider', {
+      AttributeMapping: Match.objectLike({ picture: 'picture', email: 'email' }),
+    });
+    t.hasResourceProperties('AWS::CloudFront::ResponseHeadersPolicy', {
+      ResponseHeadersPolicyConfig: {
+        SecurityHeadersConfig: { ContentSecurityPolicy: { ContentSecurityPolicy: Match.stringLikeRegexp(String.raw`img-src 'self' data: https://[*]\.googleusercontent\.com;`) } },
+      },
+    });
+  });
+
   it('keeps glimmer photos in a private, retained bucket only the journal function can use', () => {
     const buckets = Object.values(t.findResources('AWS::S3::Bucket')) as any[];
     const photos = buckets.filter((b) => b.DeletionPolicy === 'Retain');
