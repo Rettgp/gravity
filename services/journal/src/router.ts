@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import {
   HttpError,
@@ -10,14 +11,20 @@ import {
   dayInput,
   emptyDay,
   foodsOf,
+  glimmerInput,
+  MAX_GLIMMERS_PER_DAY,
   monthStr,
   MEAL_KEYS,
   normalizeFood,
+  parseDataUrl,
+  toDataUrl,
   parse,
   addDays,
   type Day,
   type DaySummary,
   type Db,
+  type PhotoStore,
+  type Glimmer,
   type HealthDay,
   type Profile,
   type Route,
@@ -33,6 +40,8 @@ export interface JournalDeps {
   coreTable: string;
   /** Read-only access to the health table, for the body strip and body signals. Absent = health is not wired up. */
   healthTable?: string;
+  /** Private photo storage (S3 in AWS). Absent = photos are not wired up and glimmers are caption-only. */
+  photos?: PhotoStore;
   allowlist: () => Promise<string[]>;
   now?: () => Date;
 }
@@ -50,7 +59,22 @@ const toDay = (it: Record<string, unknown>): Day => {
   return rest as unknown as Day;
 };
 
-export function buildJournalRouter({ db, table, coreTable, healthTable, allowlist, now = () => new Date() }: JournalDeps) {
+const toGlimmer = (it: Record<string, unknown>): Glimmer => ({
+  id: String(it.id),
+  profileId: String(it.profileId),
+  date: String(it.date),
+  ...(it.caption ? { caption: String(it.caption) } : {}),
+  hasImage: it.hasImage === true,
+  createdAt: String(it.createdAt),
+});
+const photoKey = (id: string, size: 'thumb' | 'full') => `glimmers/${id}/${size}.img`;
+const prevMonth = (m: string) => {
+  const y = Number(m.slice(0, 4));
+  const mo = Number(m.slice(5));
+  return mo === 1 ? `${y - 1}-12` : `${y}-${String(mo - 1).padStart(2, '0')}`;
+};
+
+export function buildJournalRouter({ db, table, coreTable, healthTable, photos, allowlist, now = () => new Date() }: JournalDeps) {
   const profile = async (id: string) => {
     const it = await db.get(coreTable, `PROFILE#${id}`, 'META');
     if (!it) throw new HttpError(404, 'Profile not found');
@@ -116,7 +140,10 @@ export function buildJournalRouter({ db, table, coreTable, healthTable, allowlis
         const p = await profile(params.pid!);
         const it = await db.get(table, `PROFILE#${p.id}`, `DAY#${date}`);
         if (!canReadDay(p, user.sub, !!it && it.shared === true)) throw new HttpError(404, 'Profile not found');
-        return it ? toDay(it) : emptyDay(date, p.shareByDefault);
+        const day = it ? toDay(it) : emptyDay(date, p.shareByDefault);
+        // Family sees that a day was unwell and the symptoms, never meals or notes.
+        if (!canManage(p, user.sub)) return { ...day, meals: emptyDay(date).meals, notes: undefined };
+        return day;
       },
     },
     {
@@ -206,6 +233,82 @@ export function buildJournalRouter({ db, table, coreTable, healthTable, allowlis
         const from = query.from ? parse(dateStr, query.from) : addDays(to, -90);
         const days = (await allDays(p.id)).filter((d) => d.date >= from && d.date <= to);
         return computeInsights(days);
+      },
+    },
+    {
+      // Glimmers are always visible to the family: any allowlisted member may list them.
+      method: 'GET',
+      path: '/profiles/:pid/glimmers',
+      handler: async ({ params, query }) => {
+        const month = parse(monthStr, query.month);
+        const p = await profile(params.pid!);
+        return (await db.query(table, `PROFILE#${p.id}`, `GLIMMER#${month}`)).map(toGlimmer);
+      },
+    },
+    {
+      method: 'POST',
+      path: '/profiles/:pid/glimmers',
+      handler: async ({ user, params, body }) => {
+        const p = await manage(params.pid!, user.sub);
+        const { date, caption, image } = parse(glimmerInput, body);
+        if (image && !photos) throw new HttpError(503, 'Photos are not set up');
+        const existing = await db.query(table, `PROFILE#${p.id}`, `GLIMMER#${date}#`);
+        if (existing.length >= MAX_GLIMMERS_PER_DAY) throw new HttpError(409, `That day already has ${MAX_GLIMMERS_PER_DAY} glimmers`);
+        const id = randomUUID();
+        const createdAt = now().toISOString();
+        const meta = { id, profileId: p.id, date, ...(caption ? { caption } : {}), hasImage: !!image, createdAt };
+        await db.put(table, { pk: `PROFILE#${p.id}`, sk: `GLIMMER#${date}#${id}`, ...meta, createdBy: user.sub });
+        await db.put(table, { pk: `GLIMMERFEED#${date.slice(0, 7)}`, sk: `${date}#${createdAt}#${id}`, ...meta });
+        if (image && photos) {
+          for (const [size, url] of [['thumb', image.thumb], ['full', image.full]] as const) {
+            const { contentType, bytes } = parseDataUrl(url);
+            await photos.put(photoKey(id, size), bytes, contentType);
+          }
+        }
+        return { status: 201, body: meta satisfies Glimmer };
+      },
+    },
+    {
+      method: 'DELETE',
+      path: '/profiles/:pid/glimmers/:date/:gid',
+      handler: async ({ user, params }) => {
+        const date = parse(dateStr, params.date);
+        const p = await manage(params.pid!, user.sub);
+        const gid = params.gid!;
+        const it = await db.get(table, `PROFILE#${p.id}`, `GLIMMER#${date}#${gid}`);
+        if (it) {
+          await db.delete(table, `PROFILE#${p.id}`, `GLIMMER#${date}#${gid}`);
+          await db.delete(table, `GLIMMERFEED#${date.slice(0, 7)}`, `${date}#${String(it.createdAt)}#${gid}`);
+          await photos?.delete([photoKey(gid, 'thumb'), photoKey(gid, 'full')]);
+          for (const img of await db.query(table, `GLIMMERIMG#${gid}`)) await db.delete(table, img.pk, img.sk); // photos saved before S3
+        }
+        return { status: 204 };
+      },
+    },
+    {
+      // Newest first, this month and last.
+      method: 'GET',
+      path: '/glimmers/feed',
+      handler: async () => {
+        const thisMonth = today().slice(0, 7);
+        const items = [...(await db.query(table, `GLIMMERFEED#${thisMonth}`)), ...(await db.query(table, `GLIMMERFEED#${prevMonth(thisMonth)}`))];
+        return items
+          .map(toGlimmer)
+          .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt))
+          .slice(0, 20);
+      },
+    },
+    {
+      method: 'GET',
+      path: '/glimmers/:gid/image',
+      handler: async ({ params, query }) => {
+        const size = query.size === 'full' ? 'full' : 'thumb';
+        const obj = await photos?.get(photoKey(params.gid!, size));
+        if (obj) return { dataUrl: toDataUrl(obj.contentType, obj.bytes) };
+        // Photos saved before S3 lived in the table (the full one in numbered chunks).
+        const old = size === 'full' ? await db.query(table, `GLIMMERIMG#${params.gid}`, 'full') : [await db.get(table, `GLIMMERIMG#${params.gid}`, 'thumb')].filter((x) => !!x);
+        if (old.length === 0) throw new HttpError(404, 'Not found');
+        return { dataUrl: old.map((x) => String(x!.dataUrl)).join('') };
       },
     },
     {

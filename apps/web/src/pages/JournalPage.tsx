@@ -8,6 +8,7 @@ export function JournalPage() {
   const api = useHttpJournalApi();
   const [params] = useSearchParams();
   const date = params.get('date') ?? undefined;
+  const focusGlimmer = params.get('glimmer') === '1';
 
   return (
     <div className="page">
@@ -19,7 +20,7 @@ export function JournalPage() {
       {me.isError && <p className="jr-error">Could not load your profile. Is the API running?</p>}
       {me.data && (
         <JournalApiContext.Provider value={api}>
-          <JournalView key={date ?? 'none'} profiles={me.data.profiles} family={me.data.family} defaultProfileId={me.data.defaultProfileId} initialDate={date} />
+          <JournalView key={date ?? 'none'} profiles={me.data.profiles} family={me.data.family} defaultProfileId={me.data.defaultProfileId} initialDate={date} focusGlimmer={focusGlimmer} />
         </JournalApiContext.Provider>
       )}
     </div>

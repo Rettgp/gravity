@@ -1,5 +1,7 @@
 import { createContext, useContext, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
+  addDays,
   computeInsights,
   emptyDay,
   foodsOf,
@@ -8,6 +10,8 @@ import {
   normalizeFood,
   type BodySignals,
   type Day,
+  type Glimmer,
+  type GlimmerInput,
   type DayInput,
   type DaySummary,
   type HealthDay,
@@ -35,6 +39,18 @@ export interface JournalApi {
   /** How unwell days (and the day before) and foods relate to the body numbers. */
   bodySignals(pid: string): Promise<BodySignals>;
   shared(month: string): Promise<SharedDaySummary[]>;
+  /** Glimmers are always family-visible: anyone can list a profile's month. */
+  listGlimmers(pid: string, month: string): Promise<Glimmer[]>;
+  addGlimmer(pid: string, input: GlimmerInput): Promise<Glimmer>;
+  deleteGlimmer(pid: string, date: string, id: string): Promise<void>;
+  glimmerFeed(): Promise<Glimmer[]>;
+  glimmerImage(id: string, size: 'thumb' | 'full'): Promise<string>;
+}
+
+/** Glimmer images never change, so they are cached forever once fetched. */
+export function useGlimmerImage(id: string, size: 'thumb' | 'full', enabled = true) {
+  const api = useJournalApi();
+  return useQuery({ queryKey: ['glimmers', 'image', id, size], queryFn: () => api.glimmerImage(id, size), enabled, staleTime: Infinity, gcTime: 30 * 60_000 });
 }
 
 export const JournalApiContext = createContext<JournalApi | null>(null);
@@ -57,6 +73,13 @@ export function useHttpJournalApi(): JournalApi {
       body: (pid, date) => f('/api/journal/profiles/' + pid + '/body/' + date),
       bodySignals: (pid) => f('/api/journal/profiles/' + pid + '/body-signals'),
       shared: (month) => f('/api/journal/shared?month=' + month),
+      listGlimmers: (pid, month) => f('/api/journal/profiles/' + pid + '/glimmers?month=' + month),
+      addGlimmer: (pid, input) => f('/api/journal/profiles/' + pid + '/glimmers', { method: 'POST', body: input }),
+      deleteGlimmer: async (pid, date, id) => {
+        await f('/api/journal/profiles/' + pid + '/glimmers/' + date + '/' + id, { method: 'DELETE' });
+      },
+      glimmerFeed: () => f('/api/journal/glimmers/feed'),
+      glimmerImage: async (id, size) => (await f<{ dataUrl: string }>('/api/journal/glimmers/' + id + '/image?size=' + size)).dataUrl,
     }),
     [f],
   );
@@ -73,6 +96,10 @@ const summarize = (d: Day): DaySummary => ({
 /** In-memory journal seeded with believable fake data. Powers the landing-page display frame. */
 export function createDemoApi(today: string): JournalApi {
   const days = new Map(generateDemoDays(today, 75).map((d) => [d.date, d]));
+  const glimmers: Glimmer[] = [
+    { id: 'demo-1', profileId: 'demo', date: addDays(today, -1), caption: 'Warm sun on the porch with coffee', hasImage: false, createdAt: addDays(today, -1) + 'T18:00:00Z' },
+    { id: 'demo-2', profileId: 'demo', date: addDays(today, -4), caption: 'The kids built a blanket fort', hasImage: false, createdAt: addDays(today, -4) + 'T18:00:00Z' },
+  ];
   return {
     async listMonth(_pid, month) {
       return [...days.values()].filter((d) => d.date.startsWith(month)).map(summarize);
@@ -118,6 +145,24 @@ export function createDemoApi(today: string): JournalApi {
     },
     async shared() {
       return [];
+    },
+    async listGlimmers(_pid, month) {
+      return glimmers.filter((g) => g.date.startsWith(month));
+    },
+    async addGlimmer(pid, input) {
+      const g: Glimmer = { id: 'demo-' + Math.random().toString(36).slice(2), profileId: pid, date: input.date, caption: input.caption, hasImage: !!input.image, createdAt: new Date().toISOString() };
+      glimmers.push(g);
+      return g;
+    },
+    async deleteGlimmer(_pid, _date, id) {
+      const i = glimmers.findIndex((g) => g.id === id);
+      if (i >= 0) glimmers.splice(i, 1);
+    },
+    async glimmerFeed() {
+      return [...glimmers].reverse();
+    },
+    async glimmerImage() {
+      throw new Error('No image in the demo');
     },
   };
 }

@@ -16,6 +16,9 @@
   --coral: #f0605d;
   --green: #2fb67c;
   --amber: #f5a524;
+  --glimmer: #e9a512;
+  --glimmer-soft: color-mix(in oklab, #f7c948 22%, var(--surface));
+  --glimmer-gradient: linear-gradient(135deg, #f7c948, #f5a524 40%, #f0605d 75%, #7c5cf0);
   --brand-gradient: linear-gradient(135deg, #3cc8e6, #2c95c8 45%, #7c5cf0);
 
   --font-display: 'Sora Variable', 'Inter Variable', system-ui, sans-serif;
@@ -61,6 +64,7 @@
   --unwell: #ff7b78;
   --unwell-bg: color-mix(in oklab, var(--coral) 24%, var(--surface));
   --well: #46d19a;
+  --glimmer: #ffd25e;
   --glass-border: rgba(255, 255, 255, 0.12);
   --glass-highlight: rgba(255, 255, 255, 0.15);
   --dot: rgba(255, 255, 255, 0.08);
@@ -85,6 +89,7 @@
     --unwell: #ff7b78;
     --unwell-bg: color-mix(in oklab, var(--coral) 24%, var(--surface));
     --well: #46d19a;
+    --glimmer: #ffd25e;
     --glass-border: rgba(255, 255, 255, 0.12);
     --glass-highlight: rgba(255, 255, 255, 0.15);
     --dot: rgba(255, 255, 255, 0.08);

@@ -58,6 +58,15 @@ describe('infra: nobody but the family', () => {
     });
   });
 
+  it('keeps glimmer photos in a private, retained bucket only the journal function can use', () => {
+    const buckets = Object.values(t.findResources('AWS::S3::Bucket')) as any[];
+    const photos = buckets.filter((b) => b.DeletionPolicy === 'Retain');
+    expect(photos).toHaveLength(1);
+    expect(photos[0].Properties.PublicAccessBlockConfiguration).toEqual({ BlockPublicAcls: true, BlockPublicPolicy: true, IgnorePublicAcls: true, RestrictPublicBuckets: true });
+    const withEnv = Object.values(t.findResources('AWS::Lambda::Function')).filter((f: any) => f.Properties.Environment?.Variables?.PHOTOS_BUCKET);
+    expect(withEnv).toHaveLength(1);
+  });
+
   it('serves strict security headers and never caches the API', () => {
     t.hasResourceProperties('AWS::CloudFront::ResponseHeadersPolicy', {
       ResponseHeadersPolicyConfig: {

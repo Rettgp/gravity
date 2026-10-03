@@ -34,6 +34,33 @@ export const profileInput = z.object({
 export const profilePatch = profileInput.partial();
 export const managerInput = z.object({ email: z.string().email() });
 
+/** A glimmer: a small moment that brightened the day. Always visible to the family. */
+export const MAX_GLIMMERS_PER_DAY = 3;
+/** Data-URL length caps. Photos go to S3 via the API, so the limit is Lambda's 6 MB request/response (base64 inflates by a third). */
+export const GLIMMER_FULL_MAX = 3_600_000;
+export const GLIMMER_THUMB_MAX = 400_000;
+const imageDataUrl = (max: number) =>
+  z
+    .string()
+    .max(max, 'Image is too large')
+    .regex(/^data:image\/(jpeg|webp|png);base64,[A-Za-z0-9+/]+=*$/, 'Expected a base64 JPEG, WebP or PNG');
+export const glimmerInput = z
+  .object({
+    date: dateStr,
+    caption: z.string().trim().max(280).optional(),
+    image: z.object({ full: imageDataUrl(GLIMMER_FULL_MAX), thumb: imageDataUrl(GLIMMER_THUMB_MAX) }).optional(),
+  })
+  .refine((g) => !!g.caption || !!g.image, 'Add a photo or a caption');
+export type GlimmerInput = z.infer<typeof glimmerInput>;
+export interface Glimmer {
+  id: string;
+  profileId: string;
+  date: string;
+  caption?: string;
+  hasImage: boolean;
+  createdAt: string;
+}
+
 export type FoodItem = z.infer<typeof foodItem>;
 export type Symptom = z.infer<typeof symptom>;
 export type DayInput = z.infer<typeof dayInput>;

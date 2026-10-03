@@ -20,9 +20,11 @@ interface Props {
   inline?: boolean;
   initialDate?: string;
   initialTab?: Tab;
+  /** Open the first sheet with the glimmer composer focused. */
+  focusGlimmer?: boolean;
 }
 
-export function JournalView({ profiles, family, defaultProfileId, inline, initialDate, initialTab = 'calendar' }: Props) {
+export function JournalView({ profiles, family, defaultProfileId, inline, initialDate, initialTab = 'calendar', focusGlimmer }: Props) {
   const api = useJournalApi();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [pid, setPid] = useState(defaultProfileId);
@@ -31,29 +33,38 @@ export function JournalView({ profiles, family, defaultProfileId, inline, initia
   const [unwellOnly, setUnwellOnly] = useState(false);
 
   const monthQ = useQuery({ queryKey: ['journal', 'month', pid, month], queryFn: () => api.listMonth(pid, month) });
+  const mine = profiles.some((p) => p.id === pid);
+  const others = family.filter((p) => !profiles.some((m) => m.id === p.id));
+  const glimmerQ = useQuery({ queryKey: ['journal', 'glimmers', pid, month], queryFn: () => api.listGlimmers(pid, month) });
+  const glimmerDates = useMemo(() => new Set((glimmerQ.data ?? []).map((g) => g.date)), [glimmerQ.data]);
   const sharedQ = useQuery({ queryKey: ['journal', 'shared', month], queryFn: () => api.shared(month), enabled: tab === 'family' });
   const names = useMemo(() => new Map(family.map((p) => [p.id, p])), [family]);
   const close = () => setSelected(null);
 
   const sheet = selected && (
-    <DaySheet key={selected.pid + selected.date} pid={selected.pid} date={selected.date} readOnly={selected.readOnly} ownerName={names.get(selected.pid)?.name} onClose={close} />
+    <DaySheet key={selected.pid + selected.date} pid={selected.pid} date={selected.date} readOnly={selected.readOnly || !profiles.some((p) => p.id === selected.pid)} focusGlimmer={focusGlimmer && selected.date === initialDate} ownerName={names.get(selected.pid)?.name} onClose={close} />
   );
 
   return (
     <div className={'jr' + (inline ? ' jr-inline' : '')}>
       <div className="jr-toolbar">
         <div className="jr-tabs" role="tablist" aria-label="Journal sections">
-          {(['calendar', 'insights', 'family'] as Tab[]).map((t) => (
+          {(['calendar', 'insights', 'family'] as Tab[]).filter((t) => t !== 'insights' || mine).map((t) => (
             <button key={t} role="tab" aria-selected={tab === t} className={'jr-tab' + (tab === t ? ' on' : '')} onClick={() => setTab(t)}>
               {t === 'calendar' ? 'Calendar' : t === 'insights' ? 'Insights' : 'Family'}
             </button>
           ))}
         </div>
-        {profiles.length > 1 && tab !== 'family' && (
+        {profiles.length + others.length > 1 && tab !== 'family' && (
           <div className="jr-chips" role="group" aria-label="Whose journal">
             {profiles.map((p) => (
               <button key={p.id} className="chip" aria-pressed={pid === p.id} onClick={() => (setPid(p.id), setSelected(null))}>
                 <span aria-hidden="true">{p.emoji}</span> {p.name}
+              </button>
+            ))}
+            {others.map((p) => (
+              <button key={p.id} className="chip" aria-pressed={pid === p.id} title="View only" onClick={() => (setPid(p.id), setSelected(null))}>
+                <span aria-hidden="true">{p.emoji}</span> {p.name} <span className="jr-viewonly">view only</span>
               </button>
             ))}
           </div>
@@ -67,12 +78,14 @@ export function JournalView({ profiles, family, defaultProfileId, inline, initia
             summaries={monthQ.data ?? []}
             selected={selected?.pid === pid ? selected.date : undefined}
             unwellOnly={unwellOnly}
+            glimmerDates={glimmerDates}
+            shared={!mine}
             onSelect={(date) => setSelected({ pid, date })}
             onMonth={(d) => setMonth((m) => shiftMonth(m, d))}
             onUnwellOnly={setUnwellOnly}
           />
         )}
-        {tab === 'insights' && <Insights pid={pid} />}
+        {tab === 'insights' && mine && <Insights pid={pid} />}
         {tab === 'family' && (
           <section className="card jr-family" aria-label="Shared with family">
             <h2>Shared with family</h2>

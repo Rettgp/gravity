@@ -74,5 +74,5 @@ export function useDayDraft(pid: string, date: string, readOnly?: boolean) {
     setError('');
     setDraft((d) => (d ? fn(d) : d));
   };
-  return { draft, change, status, error };
+  return { draft, change, status, error, loadError: day.error as Error | null };
 }

@@ -3,7 +3,8 @@
  * Auth is a dev-only header (x-dev-user: <email>), so it must never be deployed. It only listens on localhost.
  */
 import { createServer } from 'node:http';
-import { addDays, generateDemoDays, MemoryDb, normalizeEmail } from '@gravity/shared/server';
+import { dirname } from 'node:path';
+import { addDays, FilePhotos, generateDemoDays, MemoryDb, normalizeEmail } from '@gravity/shared/server';
 import { buildCoreRouter } from '../services/core/src/router';
 import { buildJournalRouter } from '../services/journal/src/router';
 import { FakeGoogle, fakeDay } from '../services/health/src/fake';
@@ -20,7 +21,7 @@ const ALLOWED = (process.env.LOCAL_ALLOWED_EMAILS ?? 'mom@gravity.local,dad@grav
 const db = new MemoryDb(FILE);
 const allowlist = async () => ALLOWED;
 const core = buildCoreRouter({ db, table: 'core', allowlist });
-const journal = buildJournalRouter({ db, table: 'journal', coreTable: 'core', healthTable: 'health', allowlist });
+const journal = buildJournalRouter({ db, table: 'journal', coreTable: 'core', healthTable: 'health', photos: new FilePhotos(dirname(FILE) + '/photos'), allowlist });
 // No Google in local mode: the fake bounces straight back as if consent was granted, and invents believable numbers.
 const health = buildHealthRouter({
   db,
@@ -75,18 +76,23 @@ createServer(async (req, res) => {
       // off too, so the early heads-up has something to show.
       const m = fakeDay(date);
       const before = unwell.has(addDays(date, 1));
-      const off = unwell.has(date) ? 1 : before ? 0.5 : date >= addDays(today, -1) ? 1.8 : 0;
+      const off = unwell.has(date) ? 1 : before ? 0.5 : date >= addDays(today, -1) ? 3.5 : 0;
       await db.put('health', {
         pk: 'PROFILE#' + pid,
         sk: 'DAY#' + date,
         ...m,
         date,
         restingHr: Math.round((m.restingHr ?? 64) + 6 * off),
-        hrv: Math.round(((m.hrv ?? 40) - 10 * off) * 10) / 10,
+        hrv: Math.max(8, Math.round(((m.hrv ?? 40) - 10 * off) * 10) / 10),
         sleepMinutes: Math.round((m.sleepMinutes ?? 420) - 50 * off),
         skinTempC: Math.round(((m.skinTempC ?? 32) + 0.3 * off) * 100) / 100,
         syncedAt: new Date().toISOString(),
       });
+    }
+    // A few caption-only glimmers so the dashboard card and calendar sparkles have something to show.
+    const moments = ['Warm sun on the porch with coffee', 'The kids built a blanket fort', 'Dinner was done before 7 for once'];
+    for (const [i, caption] of moments.entries()) {
+      await journal({ ...r, method: 'POST', path: '/api/journal/profiles/' + pid + '/glimmers', body: { date: addDays(today, -i * 2), caption } });
     }
     return send(res, 200, { ok: true });
   }

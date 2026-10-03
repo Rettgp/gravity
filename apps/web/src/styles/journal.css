@@ -127,3 +127,49 @@
 .jr-body-list strong { font-family: var(--font-display); font-size: 17px; }
 .jr-signals { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
 .jr-signal { line-height: 1.5; }
+
+/* Glimmers: calendar sparkle, day-sheet section, lightbox */
+.jr-dot-glimmer { background: var(--glimmer); box-shadow: 0 0 6px var(--glimmer); }
+.jr-viewonly { font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 0 6px; margin-left: 2px; }
+.jr-glimmer {
+  position: absolute; top: 3px; right: 3px; width: 13px; height: 13px; background: var(--glimmer); pointer-events: none;
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  animation: gl-twinkle 3.2s ease-in-out infinite;
+}
+.jr-day.has-glimmer:not(.is-selected) { box-shadow: 0 0 0 1px color-mix(in oklab, var(--glimmer) 55%, transparent), 0 0 14px color-mix(in oklab, var(--glimmer) 28%, transparent); }
+.jr-day.has-glimmer.is-today { box-shadow: 0 0 0 2px var(--accent) inset, 0 0 14px color-mix(in oklab, var(--glimmer) 28%, transparent); }
+@keyframes gl-twinkle { 0%, 100% { transform: scale(1) rotate(0); opacity: 1; } 50% { transform: scale(0.72) rotate(18deg); opacity: 0.75; } }
+
+.gl-sheet { border: 1px solid color-mix(in oklab, var(--glimmer) 40%, var(--border)); background: linear-gradient(160deg, var(--glimmer-soft), transparent 70%); border-radius: 18px; padding: 14px; display: grid; gap: 10px; }
+.gl-title { display: flex; align-items: center; gap: 8px; font-size: 16px; color: var(--text); }
+.gl-title svg { color: var(--glimmer); }
+.gl-lede { font-size: 13px; margin: 0; }
+.gl-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.gl-item { display: flex; align-items: center; gap: 6px; }
+.gl-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 12px; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 6px; color: var(--text); }
+.gl-open .gl-pic { width: 56px; height: 56px; border-radius: 10px; flex: none; }
+.gl-cap { overflow-wrap: anywhere; font-size: 14px; }
+.gl-compose { display: grid; gap: 8px; }
+.gl-preview { margin: 0; border-radius: 14px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--border); }
+.gl-preview img { display: block; width: 100%; max-height: 320px; object-fit: contain; }
+.gl-wait { margin: 0; font-size: 14px; }
+.gl-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.gl-row .btn { justify-content: center; align-items: center; gap: 8px; white-space: nowrap; }
+.gl-row .gl-icon { width: 48px; min-height: 48px; padding: 0; border-radius: 50%; flex: none; }
+.gl-photo { cursor: pointer; }
+.gl-remove { color: var(--unwell); }
+.gl-add { width: 100%; }
+
+.gl-pic { display: block; object-fit: cover; }
+.gl-pic-tile { background: var(--glimmer-gradient); }
+.gl-pic-tile.loading { opacity: 0.5; }
+
+.gl-lightbox { position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 16px; background: rgba(5, 8, 14, 0.82); backdrop-filter: blur(6px); }
+.gl-lightbox figure { margin: 0; max-width: min(100%, 720px); display: grid; gap: 12px; justify-items: center; color: #fff; }
+.gl-lightbox img { max-width: 100%; max-height: 72vh; border-radius: 16px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); }
+.gl-lightbox figcaption { text-align: center; display: grid; gap: 4px; }
+.gl-lightbox figcaption p { margin: 0; font-size: 18px; }
+.gl-lightbox figcaption small { opacity: 0.7; }
+.gl-lightbox-x { position: absolute; top: 12px; right: 12px; color: #fff; }
+
+@media (prefers-reduced-motion: reduce) { .jr-glimmer { animation: none; } }

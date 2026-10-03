@@ -7,6 +7,7 @@ import { Icon } from '../../components/Icon';
 import { dayLabel } from '../../lib/dates';
 import { useJournalApi } from './api';
 import { BodyStrip } from './BodyStrip';
+import { Glimmers } from './Glimmers';
 import { Meals } from './Meals';
 import { Symptoms } from './Symptoms';
 import { useDayDraft } from './useDayDraft';
@@ -16,12 +17,14 @@ interface Props {
   date: string;
   readOnly?: boolean;
   ownerName?: string;
+  /** Open with the glimmer composer focused. */
+  focusGlimmer?: boolean;
   onClose: () => void;
 }
 
-export function DaySheet({ pid, date, readOnly, ownerName, onClose }: Props) {
+export function DaySheet({ pid, date, readOnly, ownerName, focusGlimmer, onClose }: Props) {
   const api = useJournalApi();
-  const { draft, change, status, error } = useDayDraft(pid, date, readOnly);
+  const { draft, change, status, error, loadError } = useDayDraft(pid, date, readOnly);
   const foods = useQuery({ queryKey: ['journal', 'foods', pid], queryFn: () => api.foods(pid), enabled: !readOnly });
   const closeRef = useRef<HTMLButtonElement>(null);
   const qc = useQueryClient();
@@ -83,11 +86,17 @@ export function DaySheet({ pid, date, readOnly, ownerName, onClose }: Props) {
             <Icon name="x" />
           </button>
         </header>
-        {!draft ? (
+        {!draft && readOnly && loadError ? (
+          <div className="jr-sheet-body">
+            <Glimmers pid={pid} date={date} readOnly ownerName={ownerName} />
+            <p className="muted">{(ownerName ?? 'They') + ' kept the rest of this day private.'}</p>
+          </div>
+        ) : !draft ? (
           <p className="muted">Loading...</p>
         ) : (
           <div className="jr-sheet-body">
             {!readOnly && <BodyStrip pid={pid} date={date} />}
+            <Glimmers pid={pid} date={date} readOnly={readOnly} ownerName={ownerName} autoFocus={focusGlimmer} />
             <div className={'jr-unwell' + (draft.unwell ? ' on' : '')}>
               <div>
                 <strong id="unwell-label">Felt unwell today</strong>
@@ -96,13 +105,15 @@ export function DaySheet({ pid, date, readOnly, ownerName, onClose }: Props) {
               <button className="switch" role="switch" aria-checked={draft.unwell} aria-labelledby="unwell-label" disabled={readOnly} onClick={() => change((d) => ({ ...d, unwell: !d.unwell }))} />
             </div>
             {draft.unwell && <Symptoms symptoms={draft.symptoms} readOnly={readOnly} onToggle={toggleSymptom} onSeverity={setSeverity} />}
-            <Meals meals={draft.meals} suggestions={suggestions} readOnly={readOnly} onAdd={addFood} onRemove={removeFood} onEdit={editFood} onForget={setForgetting} />
-            <section className="jr-block">
-              <label className="field">
-                Notes
-                <textarea className="input" value={draft.notes ?? ''} disabled={readOnly} maxLength={2000} placeholder="Sleep, stress, activity, anything else..." onChange={(e) => change((d) => ({ ...d, notes: e.target.value }))} />
-              </label>
-            </section>
+            {!readOnly && <Meals meals={draft.meals} suggestions={suggestions} readOnly={readOnly} onAdd={addFood} onRemove={removeFood} onEdit={editFood} onForget={setForgetting} />}
+            {!readOnly && (
+              <section className="jr-block">
+                <label className="field">
+                  Notes
+                  <textarea className="input" value={draft.notes ?? ''} maxLength={2000} placeholder="Sleep, stress, activity, anything else..." onChange={(e) => change((d) => ({ ...d, notes: e.target.value }))} />
+                </label>
+              </section>
+            )}
             {!readOnly && (
               <div className="jr-share">
                 <Icon name="lock" />

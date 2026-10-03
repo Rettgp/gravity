@@ -241,7 +241,15 @@ export class GravityStack extends Stack {
     // Keep data fresh without anyone opening the site. Also finishes any history import that was left half-done.
     new Rule(this, 'HealthSync', { schedule: Schedule.rate(Duration.hours(4)), targets: [new LambdaFunction(health.fn)] });
 
-    new GravityService(this, 'Journal', {
+    // Glimmer photos: a private bucket the journal function reads and writes. No public access and no presigned
+    // URLs, so a photo can only leave through the authenticated API. Retained like the tables: family data is never torn down.
+    const photos = new Bucket(this, 'Photos', {
+      blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
+      encryption: BucketEncryption.S3_MANAGED,
+      enforceSSL: true,
+      removalPolicy: RemovalPolicy.RETAIN,
+    });
+    const journal = new GravityService(this, 'Journal', {
       name: 'journal',
       api,
       authorizer,
@@ -251,6 +259,8 @@ export class GravityStack extends Stack {
         { table: health.table, envName: 'HEALTH_TABLE' },
       ],
     });
+    photos.grantReadWrite(journal.fn);
+    journal.fn.addEnvironment('PHOTOS_BUCKET', photos.bucketName);
 
     // ---- Publish the SPA + runtime config ----------------------------------------------------------------------
     const webDist = props.webDist && fs.existsSync(props.webDist) ? props.webDist : path.join(REPO_ROOT, 'infra', 'empty-site');

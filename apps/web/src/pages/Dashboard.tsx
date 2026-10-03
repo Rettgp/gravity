@@ -10,7 +10,8 @@ import { useMe } from '../lib/me';
 import { MODULES } from '../modules/registry';
 import { DashboardHeadsUp } from '../modules/health/HeadsUp';
 import { StepsPodium } from '../modules/health/StepsPodium';
-import { useHttpJournalApi } from '../modules/journal/api';
+import { JournalApiContext, useHttpJournalApi } from '../modules/journal/api';
+import { GlimmerFeed } from '../modules/journal/GlimmerFeed';
 
 const greeting = () => {
   const h = new Date().getHours();
@@ -30,6 +31,10 @@ export function Dashboard() {
   const results = useQueries({
     queries: months.map((m) => ({ queryKey: ['journal', 'month', pid, m], queryFn: () => api.listMonth(pid!, m), enabled: !!pid })),
   });
+  const glimmerResults = useQueries({
+    queries: months.map((m) => ({ queryKey: ['journal', 'glimmers', pid, m], queryFn: () => api.listGlimmers(pid!, m), enabled: !!pid })),
+  });
+  const glimmerDays = new Set(glimmerResults.flatMap((r) => r.data ?? []).map((g) => g.date));
   const byDate = new Map(results.flatMap((r) => r.data ?? []).map((s) => [s.date, s]));
   const seed = useMutation({
     mutationFn: () => f('/api/dev/seed', { method: 'POST' }),
@@ -45,6 +50,12 @@ export function Dashboard() {
       </header>
 
       <DashboardHeadsUp pid={pid} />
+
+      {me.data && (
+        <JournalApiContext.Provider value={api}>
+          <GlimmerFeed family={me.data.family} />
+        </JournalApiContext.Provider>
+      )}
 
       <StepsPodium />
 
@@ -66,7 +77,7 @@ export function Dashboard() {
             const cls = s?.unwell ? 'unwell' : s ? 'logged' : '';
             return (
               <li key={d}>
-                <Link to={'/app/journal?date=' + d} className={'week-day ' + cls} aria-label={d + (s?.unwell ? ', felt unwell' : s ? ', logged' : ', nothing logged')}>
+                <Link to={'/app/journal?date=' + d} className={'week-day ' + cls + (glimmerDays.has(d) ? ' has-glimmer' : '')} aria-label={d + (s?.unwell ? ', felt unwell' : s ? ', logged' : ', nothing logged') + (glimmerDays.has(d) ? ', has a glimmer' : '')}>
                   <small>{new Date(d + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'short' })}</small>
                   <b>{Number(d.slice(8))}</b>
                 </Link>

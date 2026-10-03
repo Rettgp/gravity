@@ -100,6 +100,8 @@ test.describe('journal', () => {
     const teen = await ctx.newPage();
     await signIn(teen, 'teen');
     await teen.getByRole('link', { name: 'Journal', exact: true }).first().click();
+    // The feed shows the calendar's month; early in a month the shared day is in the previous one.
+    if (date.slice(0, 7) !== today.slice(0, 7)) await teen.getByRole('button', { name: 'Previous month' }).click();
     await teen.getByRole('tab', { name: 'Family' }).click();
     const row = teen.locator('.jr-feed-row', { hasText: date });
     await expect(row).toContainText('Felt unwell');
@@ -139,6 +141,104 @@ test.describe('journal', () => {
     const junior = profiles.find((p: { name: string }) => p.name === 'Junior');
     const res = await request.get('/api/journal/profiles/' + junior.id + '/days/' + today, { headers: { 'x-dev-user': 'teen@gravity.local' } });
     expect(res.status()).toBe(404);
+  });
+});
+
+test.describe('glimmers', () => {
+  // A real (tiny) PNG: the app decodes and recompresses it in the browser before upload.
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+
+  test('add one with a photo, see it sparkle on the calendar and shine on the dashboard; family sees it view-only', async ({ page, browser }, info) => {
+    test.skip(info.project.name !== 'desktop', 'desktop only');
+    const errors = watchErrors(page);
+    const date = addDays(today, -1);
+    await signIn(page, 'mom');
+    await page.goto('/app/journal?date=' + date);
+    const sheet = page.getByRole('dialog');
+    await sheet.getByLabel('Glimmer photo').setInputFiles({ name: 'walk.png', mimeType: 'image/png', buffer: PNG });
+    await expect(sheet.locator('.gl-preview img')).toBeVisible();
+    await sheet.getByLabel('Glimmer caption').fill('Golden hour walk with the dog');
+    await sheet.getByRole('button', { name: 'Add glimmer' }).click();
+    await expect(sheet.getByRole('button', { name: /Open glimmer: Golden hour walk/ })).toBeVisible();
+    await sheet.getByRole('button', { name: 'Close' }).click();
+    await expect(cell(page, date)).toHaveAttribute('data-glimmer', 'true');
+    await expect(cell(page, date)).toHaveAttribute('aria-label', /has a glimmer/);
+    await page.screenshot({ path: ART + '/glimmer-calendar-' + info.project.name + '.png' });
+
+    await page.getByRole('link', { name: 'Home', exact: true }).first().click();
+    const card = page.getByRole('region', { name: 'Glimmers' });
+    await expect(card.getByRole('button', { name: /Golden hour walk/ })).toBeVisible();
+    await expect(card.locator('img.gl-pic')).toBeVisible();
+    await page.screenshot({ path: ART + '/glimmer-dashboard-' + info.project.name + '.png' });
+    await card.getByRole('button', { name: /Golden hour walk/ }).click();
+    await expect(page.getByRole('dialog', { name: 'Glimmer' }).locator('img')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Glimmer' })).toHaveCount(0);
+
+    // A family member sees it on the dashboard and on mom's calendar, but cannot edit and never sees the day's meals.
+    const ctx = await browser.newContext({ baseURL: info.project.use.baseURL });
+    const dad = await ctx.newPage();
+    await signIn(dad, 'dad');
+    await expect(dad.getByRole('region', { name: 'Glimmers' }).getByRole('button', { name: /Golden hour walk/ })).toBeVisible();
+    await dad.getByRole('link', { name: 'Journal', exact: true }).first().click();
+    await dad.getByRole('button', { name: /Mom/ }).click();
+    await expect(cell(dad, date)).toHaveAttribute('data-glimmer', 'true');
+    await cell(dad, date).click();
+    const ro = dad.getByRole('dialog');
+    await expect(ro.getByRole('button', { name: /Open glimmer: Golden hour walk/ })).toBeVisible();
+    await expect(ro.getByRole('button', { name: 'Add glimmer' })).toHaveCount(0);
+    await expect(ro.getByRole('button', { name: 'Remove glimmer' })).toHaveCount(0);
+    await expect(ro.getByRole('combobox', { name: /Add food/ })).toHaveCount(0);
+    await dad.screenshot({ path: ART + '/glimmer-family-view-' + info.project.name + '.png' });
+    await ctx.close();
+    expect(errors.filter((e) => !/DevTools/.test(e))).toEqual([]);
+  });
+});
+
+test.describe('glimmer photos', () => {
+  test('a big photo is previewed, stays sharp, and can be swapped or removed (phone and desktop)', async ({ page }, info) => {
+    const sharp = (await import('sharp')).default;
+    // Random noise barely compresses, so this is the worst case for the size budget.
+    const noise = (w: number, h: number) => sharp(Buffer.from(Array.from({ length: w * h * 3 }, () => Math.floor(Math.random() * 256))), { raw: { width: w, height: h, channels: 3 } }).jpeg({ quality: 95 }).toBuffer();
+    const big = await noise(3000, 2000);
+    const small = await noise(600, 400);
+    const who = info.project.name === 'mobile' ? 'teen' : 'mom';
+    const date = addDays(today, info.project.name === 'mobile' ? -9 : -8);
+    await signIn(page, who);
+    await page.goto('/app/journal?date=' + date);
+    const sheet = page.getByRole('dialog');
+    const input = sheet.getByLabel('Glimmer photo');
+
+    await input.setInputFiles({ name: 'a.jpg', mimeType: 'image/jpeg', buffer: small });
+    const preview = sheet.locator('.gl-preview img');
+    await expect(preview).toBeVisible();
+    const first = await preview.getAttribute('src');
+    // Picking another photo replaces the preview.
+    await input.setInputFiles({ name: 'b.jpg', mimeType: 'image/jpeg', buffer: big });
+    await expect(preview).toBeVisible();
+    await expect.poll(async () => await preview.getAttribute('src')).not.toBe(first);
+    await page.screenshot({ path: ART + '/glimmer-compose-' + info.project.name + '.png' });
+    // The controls fit the screen and are finger-sized.
+    for (const sel of ['.gl-photo', '.gl-remove']) {
+      const box = await sheet.locator(sel).boundingBox();
+      expect(box!.height).toBeGreaterThanOrEqual(44);
+      expect(box!.width).toBeGreaterThanOrEqual(44);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+    }
+    await expect(sheet.getByText('Change photo')).toHaveCount(0); // icon-only: no visible text
+    // Remove clears it, and the same photo can be picked again afterwards.
+    await sheet.getByRole('button', { name: 'Remove photo' }).click();
+    await expect(preview).toHaveCount(0);
+    await input.setInputFiles({ name: 'b.jpg', mimeType: 'image/jpeg', buffer: big });
+    await expect(preview).toBeVisible();
+    await sheet.getByLabel('Glimmer caption').fill('Big photo');
+    await sheet.getByRole('button', { name: 'Add glimmer' }).click();
+
+    // Open it full size: it must keep real resolution, not a postage stamp.
+    await sheet.getByRole('button', { name: /Open glimmer: Big photo/ }).click();
+    const full = page.getByRole('dialog', { name: 'Glimmer' }).locator('img');
+    await expect(full).toBeVisible();
+    await expect.poll(async () => await full.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBeGreaterThanOrEqual(1600);
   });
 });
 

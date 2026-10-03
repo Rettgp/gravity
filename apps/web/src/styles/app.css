@@ -97,3 +97,56 @@ a.tile:hover { transform: translateY(-2px); border-color: var(--accent); }
 .cd-actions { display: flex; gap: 10px; justify-content: flex-end; width: 100%; margin-top: 8px; }
 .cd-actions .btn { flex: 1; white-space: nowrap; padding: 0 12px; }
 .crash-detail { font-size: 12px; word-break: break-word; }
+
+/* Glimmers card on the dashboard */
+@property --gl-angle { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.gl-card {
+  position: relative; overflow: hidden; border: 2px solid transparent;
+  background:
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    conic-gradient(from var(--gl-angle), #f7c948, #f5a524, #f0605d, #7c5cf0, #f7c948) border-box;
+  animation: gl-spin 9s linear infinite;
+  box-shadow: 0 10px 40px -18px color-mix(in oklab, var(--glimmer) 70%, transparent);
+}
+@keyframes gl-spin { to { --gl-angle: 360deg; } }
+.gl-card::before { content: ''; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 80% at 0% 0%, color-mix(in oklab, var(--glimmer) 20%, transparent), transparent 60%); }
+.gl-card > * { position: relative; }
+.gl-head { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.gl-head h2 { display: flex; align-items: center; gap: 8px; }
+.gl-head h2 svg { color: var(--glimmer); }
+.gl-empty { margin: 8px 0 0; font-size: 17px; font-family: var(--font-display); }
+.gl-sparkles { position: absolute; top: 0; right: 0; width: 140px; height: 90px; pointer-events: none; }
+.gl-sparkles i {
+  position: absolute; width: 10px; height: 10px; background: var(--glimmer);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+  animation: gl-float 5s ease-in-out infinite;
+}
+.gl-sparkles i:nth-child(1) { top: 14px; right: 24px; }
+.gl-sparkles i:nth-child(2) { top: 40px; right: 70px; width: 7px; height: 7px; animation-delay: 1.2s; }
+.gl-sparkles i:nth-child(3) { top: 10px; right: 96px; width: 6px; height: 6px; animation-delay: 2.1s; }
+.gl-sparkles i:nth-child(4) { top: 56px; right: 18px; width: 8px; height: 8px; animation-delay: 3s; }
+@keyframes gl-float { 0%, 100% { transform: translateY(0) scale(1); opacity: 0.95; } 50% { transform: translateY(-6px) scale(0.6); opacity: 0.4; } }
+
+.gl-strip { list-style: none; margin: 0 -4px; padding: 4px; display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin; }
+.gl-slide { flex: none; width: min(240px, 72%); scroll-snap-align: start; }
+.gl-tile { position: relative; display: block; width: 100%; aspect-ratio: 4 / 5; border: 0; padding: 0; border-radius: 18px; overflow: hidden; color: #fff; background: var(--surface-2); transition: transform 0.25s var(--ease-out); }
+.gl-tile:hover { transform: translateY(-3px) rotate(-0.4deg); }
+.gl-tile .gl-pic { position: absolute; inset: 0; width: 100%; height: 100%; }
+.gl-scrim { position: absolute; inset: auto 0 0 0; padding: 40px 12px 12px; display: grid; gap: 8px; text-align: left; background: linear-gradient(to top, rgba(8, 10, 20, 0.82), transparent); }
+.gl-text { font-family: var(--font-display); font-size: 16px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.gl-by { display: flex; align-items: center; gap: 8px; font-size: 12px; opacity: 0.92; }
+.gl-avatar { width: 24px; height: 24px; font-size: 13px; flex: none; }
+.gl-new {
+  position: absolute; top: 10px; left: 10px; z-index: 1; padding: 2px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; color: #3a2400;
+  background: linear-gradient(110deg, #ffd25e 30%, #fff3c4 50%, #ffd25e 70%) 0 0 / 200% 100%; animation: gl-shine 2.4s linear infinite;
+}
+@keyframes gl-shine { to { background-position: -200% 0; } }
+.week-day.has-glimmer { position: relative; box-shadow: 0 0 12px color-mix(in oklab, var(--glimmer) 35%, transparent); }
+.week-day.has-glimmer::after {
+  content: ''; position: absolute; top: 5px; right: 6px; width: 10px; height: 10px; background: var(--glimmer);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .gl-card, .gl-sparkles i, .gl-new { animation: none; }
+  .gl-tile { transition: none; }
+}
