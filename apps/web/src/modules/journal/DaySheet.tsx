@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'motion/react';
-import type { MealKey } from '@gravity/shared';
+import { MED_DOSE_MAX, MED_DOSE_STEP, type MealKey, type Medication } from '@gravity/shared';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Icon } from '../../components/Icon';
-import { dayLabel } from '../../lib/dates';
+import { dayLabel, localClock } from '../../lib/dates';
 import { useJournalApi } from './api';
 import { BodyStrip } from './BodyStrip';
 import { Glimmers } from './Glimmers';
 import { Meals } from './Meals';
+import { MedicineCabinet } from './MedicineCabinet';
+import { Medicines } from './Medicines';
 import { Symptoms } from './Symptoms';
 import { useDayDraft } from './useDayDraft';
 
@@ -19,16 +21,19 @@ interface Props {
   ownerName?: string;
   /** Open with the glimmer composer focused. */
   focusGlimmer?: boolean;
+  /** Open with the medicine cabinet open. */
+  focusCabinet?: boolean;
   onClose: () => void;
 }
 
-export function DaySheet({ pid, date, readOnly, ownerName, focusGlimmer, onClose }: Props) {
+export function DaySheet({ pid, date, readOnly, ownerName, focusGlimmer, focusCabinet, onClose }: Props) {
   const api = useJournalApi();
   const { draft, change, status, error, loadError } = useDayDraft(pid, date, readOnly);
   const foods = useQuery({ queryKey: ['journal', 'foods', pid], queryFn: () => api.foods(pid), enabled: !readOnly });
   const closeRef = useRef<HTMLButtonElement>(null);
   const qc = useQueryClient();
   const [forgetting, setForgetting] = useState<string | null>(null);
+  const [cabinetOpen, setCabinetOpen] = useState(!!focusCabinet && !readOnly);
 
   useEffect(() => {
     closeRef.current?.focus({ preventScroll: true });
@@ -57,6 +62,14 @@ export function DaySheet({ pid, date, readOnly, ownerName, focusGlimmer, onClose
       return { ...d, symptoms };
     });
   const setSeverity = (n: string, severity: number) => change((d) => ({ ...d, symptoms: d.symptoms.map((s) => (s.name === n ? { ...s, severity } : s)) }));
+
+  const toggleMed = (m: Medication) =>
+    change((d) => ({
+      ...d,
+      meds: d.meds.some((t) => t.id === m.id) ? d.meds.filter((t) => t.id !== m.id) : [...d.meds, { id: m.id, name: m.name, dose: 1, time: localClock() }],
+    }));
+  const setDose = (id: string, dose: number) =>
+    change((d) => ({ ...d, meds: d.meds.map((t) => (t.id === id ? { ...t, dose: Math.min(MED_DOSE_MAX, Math.max(MED_DOSE_STEP, dose)) } : t)) }));
 
   const statusText = readOnly
     ? 'Shared by ' + (ownerName ?? 'family') + ' - view only'
@@ -105,6 +118,7 @@ export function DaySheet({ pid, date, readOnly, ownerName, focusGlimmer, onClose
               <button className="switch" role="switch" aria-checked={draft.unwell} aria-labelledby="unwell-label" disabled={readOnly} onClick={() => change((d) => ({ ...d, unwell: !d.unwell }))} />
             </div>
             {draft.unwell && <Symptoms symptoms={draft.symptoms} readOnly={readOnly} onToggle={toggleSymptom} onSeverity={setSeverity} />}
+            {(!readOnly || draft.meds.length > 0) && <Medicines meds={draft.meds} readOnly={readOnly} onOpen={() => setCabinetOpen(true)} />}
             {!readOnly && <Meals meals={draft.meals} suggestions={suggestions} readOnly={readOnly} onAdd={addFood} onRemove={removeFood} onEdit={editFood} onForget={setForgetting} />}
             {!readOnly && (
               <section className="jr-block">
@@ -119,7 +133,7 @@ export function DaySheet({ pid, date, readOnly, ownerName, focusGlimmer, onClose
                 <Icon name="lock" />
                 <div>
                   <strong id="share-label">{draft.shared ? 'Visible to family' : 'Private to you'}</strong>
-                  <p className="muted">Family can see that a day was unwell and the symptoms, never your notes or meals.</p>
+                  <p className="muted">Family can see that a day was unwell, symptoms and medicines, never your notes or meals.</p>
                 </div>
                 <button className="switch neutral" role="switch" aria-checked={draft.shared} aria-labelledby="share-label" onClick={() => change((d) => ({ ...d, shared: !d.shared }))} />
               </div>
@@ -127,6 +141,7 @@ export function DaySheet({ pid, date, readOnly, ownerName, focusGlimmer, onClose
           </div>
         )}
       </motion.aside>
+      {cabinetOpen && !readOnly && draft && <MedicineCabinet taken={draft.meds} onToggle={toggleMed} onDose={setDose} onClose={() => setCabinetOpen(false)} />}
       {forgetting && (
         <ConfirmDialog
           danger

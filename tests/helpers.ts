@@ -52,6 +52,7 @@ export const day = (over: Partial<DayInput> = {}): DayInput => ({
   meals: { breakfast: [], lunch: [], dinner: [], snacks: [] },
   unwell: false,
   symptoms: [],
+  meds: [],
   shared: false,
   ...over,
 });

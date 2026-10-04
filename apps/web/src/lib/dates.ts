@@ -19,3 +19,13 @@ export const dayLabel = (date: string) =>
   new Date(date + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 /** Weekday index (0=Sun) of the 1st of the month. */
 export const firstWeekday = (month: string) => new Date(month + '-01T12:00:00').getDay();
+/** '09:03' -> '9:03am' */
+export const formatClock = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map(Number) as [number, number];
+  return (h % 12 || 12) + ':' + pad(m) + (h < 12 ? 'am' : 'pm');
+};
+/** Current local time as HH:MM. */
+export const localClock = () => {
+  const d = new Date();
+  return pad(d.getHours()) + ':' + pad(d.getMinutes());
+};

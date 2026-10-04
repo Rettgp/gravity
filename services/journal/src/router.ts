@@ -12,7 +12,9 @@ import {
   emptyDay,
   foodsOf,
   glimmerInput,
+  MAX_CABINET,
   MAX_GLIMMERS_PER_DAY,
+  medInput,
   monthStr,
   MEAL_KEYS,
   normalizeFood,
@@ -25,6 +27,7 @@ import {
   type Db,
   type PhotoStore,
   type Glimmer,
+  type Medication,
   type HealthDay,
   type Profile,
   type Route,
@@ -56,8 +59,10 @@ const summarize = (d: Day): DaySummary => ({
 });
 const toDay = (it: Record<string, unknown>): Day => {
   const { pk: _pk, sk: _sk, ...rest } = it;
-  return rest as unknown as Day;
+  return { meds: [], ...rest } as unknown as Day;
 };
+const toMed = (it: Record<string, unknown>): Medication => ({ id: String(it.id), name: String(it.name), createdAt: String(it.createdAt) });
+const CABINET = 'CABINET';
 
 const toGlimmer = (it: Record<string, unknown>): Glimmer => ({
   id: String(it.id),
@@ -233,6 +238,34 @@ export function buildJournalRouter({ db, table, coreTable, healthTable, photos, 
         const from = query.from ? parse(dateStr, query.from) : addDays(to, -90);
         const days = (await allDays(p.id)).filter((d) => d.date >= from && d.date <= to);
         return computeInsights(days);
+      },
+    },
+    {
+      // The family medicine cabinet: a shared list of names. Any allowlisted member may read and change it.
+      method: 'GET',
+      path: '/cabinet',
+      handler: async () => (await db.query(table, CABINET, 'MED#')).map(toMed).sort((a, b) => a.name.localeCompare(b.name)),
+    },
+    {
+      method: 'POST',
+      path: '/cabinet',
+      handler: async ({ user, body }) => {
+        const { name } = parse(medInput, body);
+        const existing = await db.query(table, CABINET, 'MED#');
+        if (existing.length >= MAX_CABINET) throw new HttpError(409, 'The cabinet is full');
+        if (existing.some((m) => String(m.name).toLowerCase() === name.toLowerCase())) throw new HttpError(409, 'That medicine is already in the cabinet');
+        const id = randomUUID();
+        const meta = { id, name, createdAt: now().toISOString() };
+        await db.put(table, { pk: CABINET, sk: `MED#${id}`, ...meta, createdBy: user.sub });
+        return { status: 201, body: meta satisfies Medication };
+      },
+    },
+    {
+      method: 'DELETE',
+      path: '/cabinet/:id',
+      handler: async ({ params }) => {
+        await db.delete(table, CABINET, `MED#${params.id}`);
+        return { status: 204 };
       },
     },
     {

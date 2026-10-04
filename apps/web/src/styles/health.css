@@ -50,7 +50,7 @@
 
 /* ---- Detail view ---- */
 .hl-modal {
-  position: fixed; z-index: 51; left: 0; right: 0; bottom: 0; max-height: 94dvh; overflow: auto; overscroll-behavior: contain;
+  position: fixed; z-index: 51; left: 0; right: 0; bottom: 0; max-height: 75dvh; overflow: auto; overscroll-behavior: contain;
   display: grid; gap: 16px; align-content: start;
   background: var(--surface); border: 1px solid var(--border); border-radius: 28px 28px 0 0;
   padding: 20px 16px calc(24px + env(safe-area-inset-bottom));

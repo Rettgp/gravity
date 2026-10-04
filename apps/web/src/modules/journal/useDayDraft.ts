@@ -5,7 +5,7 @@ import { monthOf } from '../../lib/dates';
 import { useJournalApi } from './api';
 
 export type Draft = Omit<DayInput, 'expectedUpdatedAt'>;
-const toDraft = (d: Day): Draft => ({ meals: d.meals, unwell: d.unwell, symptoms: d.symptoms, notes: d.notes, shared: d.shared });
+const toDraft = (d: Day): Draft => ({ meals: d.meals, unwell: d.unwell, symptoms: d.symptoms, meds: d.meds ?? [], notes: d.notes, shared: d.shared });
 
 /** Loads a day, holds an editable draft, and autosaves (debounced) once the user changes something. */
 export function useDayDraft(pid: string, date: string, readOnly?: boolean) {

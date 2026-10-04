@@ -393,3 +393,60 @@ test.describe('confirm dialog', () => {
     await dlg.getByRole('button', { name: 'Cancel' }).click();
   });
 });
+
+test.describe('medicine cabinet', () => {
+  test('add a medicine, take it with a dose, see it outside the cabinet, undo and delete', async ({ page }, info) => {
+    const errors = watchErrors(page);
+    const who = info.project.name === 'mobile' ? 'teen' : 'mom';
+    const name = 'Ibuprofen ' + info.project.name;
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await signIn(page, who);
+    await page.goto('/app/journal?date=' + today);
+    const sheet = page.getByRole('dialog', { name: /^Journal for/ });
+    await sheet.getByRole('button', { name: 'Open medicine cabinet' }).click();
+
+    const cab = page.getByRole('dialog', { name: 'Medicine cabinet' });
+    await cab.getByRole('textbox', { name: 'Add medication' }).fill(name);
+    await cab.getByRole('textbox', { name: 'Add medication' }).press('Enter');
+    const pill = cab.getByRole('button', { name: new RegExp(name, 'i'), pressed: false });
+    await pill.click();
+    await expect(cab.getByRole('group', { name: 'Dose of ' + name })).toContainText('1');
+    await cab.getByRole('button', { name: 'Increase dose of ' + name }).click();
+    await expect(cab.getByRole('group', { name: 'Dose of ' + name })).toContainText('1.5');
+    await page.screenshot({ path: ART + '/cabinet-dark-' + info.project.name + '.png' });
+    await cab.getByRole('button', { name: 'Close medicine cabinet' }).click();
+    await expect(cab).toBeHidden();
+
+    // Taken medicines show in the day sheet itself, with dose and time.
+    const taken = sheet.locator('.md-taken-pill', { hasText: name });
+    await expect(taken).toContainText('1.5');
+    await expect(taken).toContainText(/\d{1,2}:\d{2}(am|pm)/);
+    await saved(page);
+    await page.screenshot({ path: ART + '/medicine-dark-' + info.project.name + '.png' });
+    await page.reload();
+    await expect(page.getByRole('dialog', { name: /^Journal for/ }).locator('.md-taken-pill', { hasText: name })).toContainText('1.5');
+
+    // Tap again to deselect, then remove it from the cabinet.
+    await page.getByRole('dialog', { name: /^Journal for/ }).getByRole('button', { name: 'Open medicine cabinet' }).last().click();
+    await cab.getByRole('button', { name: new RegExp(name, 'i'), pressed: true }).click();
+    await cab.getByRole('button', { name: 'Edit cabinet' }).click();
+    await cab.getByRole('button', { name: 'Remove ' + name + ' from the cabinet' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Remove', exact: true }).click();
+    await expect(cab.getByText(name)).toHaveCount(0);
+    await cab.getByRole('button', { name: 'Close medicine cabinet' }).click();
+    await expect(page.locator('.md-taken-pill', { hasText: name })).toHaveCount(0);
+    expect(errors.filter((e) => !/DevTools/.test(e))).toEqual([]);
+  });
+
+  test('the Medicine tile on the dashboard opens the cabinet on today', async ({ page }) => {
+    await signIn(page, 'dad');
+    await page.getByRole('link', { name: /Medicine/ }).first().click();
+    await expect(page.getByRole('dialog', { name: 'Medicine cabinet' })).toBeVisible();
+    // It opens only that once: reopening today from the calendar must not pop the cabinet again.
+    await page.getByRole('button', { name: 'Close medicine cabinet' }).click();
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await cell(page, today).click();
+    await expect(page.getByRole('dialog', { name: /^Journal for/ })).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Medicine cabinet' })).toHaveCount(0);
+  });
+});

@@ -1,13 +1,15 @@
 import { useSearchParams } from 'react-router-dom';
 import { JournalApiContext, useHttpJournalApi } from '../modules/journal/api';
 import { JournalView } from '../modules/journal/JournalView';
+import { localToday } from '../lib/dates';
 import { useMe } from '../lib/me';
 
 export function JournalPage() {
   const me = useMe();
   const api = useHttpJournalApi();
   const [params] = useSearchParams();
-  const date = params.get('date') ?? undefined;
+  const focusCabinet = params.get('cabinet') === '1';
+  const date = params.get('date') ?? (focusCabinet ? localToday() : undefined);
   const focusGlimmer = params.get('glimmer') === '1';
 
   return (
@@ -20,7 +22,7 @@ export function JournalPage() {
       {me.isError && <p className="jr-error">Could not load your profile. Is the API running?</p>}
       {me.data && (
         <JournalApiContext.Provider value={api}>
-          <JournalView key={date ?? 'none'} profiles={me.data.profiles} family={me.data.family} defaultProfileId={me.data.defaultProfileId} initialDate={date} focusGlimmer={focusGlimmer} />
+          <JournalView key={date ?? 'none'} profiles={me.data.profiles} family={me.data.family} defaultProfileId={me.data.defaultProfileId} initialDate={date} focusGlimmer={focusGlimmer} focusCabinet={focusCabinet} />
         </JournalApiContext.Provider>
       )}
     </div>

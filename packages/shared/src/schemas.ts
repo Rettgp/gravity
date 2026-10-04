@@ -15,11 +15,26 @@ export const symptom = z.object({
   notes: z.string().max(200).optional(),
 });
 
+/** Family medicine cabinet: names only, shared by everyone. */
+export const MAX_CABINET = 100;
+export const MED_DOSE_STEP = 0.5;
+export const MED_DOSE_MAX = 20;
+export const medName = z.string().trim().min(1).max(60);
+export const medInput = z.object({ name: medName });
+/** A medicine taken on a day. The name is copied in, so removing it from the cabinet keeps history intact. */
+export const takenMed = z.object({
+  id: z.string().min(1).max(64),
+  name: medName,
+  dose: z.number().min(MED_DOSE_STEP).max(MED_DOSE_MAX).multipleOf(MED_DOSE_STEP),
+  time: z.string().regex(/^\d{2}:\d{2}$/),
+});
+
 const mealList = z.array(foodItem).max(30);
 export const dayInput = z.object({
   meals: z.object({ breakfast: mealList, lunch: mealList, dinner: mealList, snacks: mealList }),
   unwell: z.boolean(),
   symptoms: z.array(symptom).max(20),
+  meds: z.array(takenMed).max(30).default([]),
   notes: z.string().max(2000).optional(),
   shared: z.boolean(),
   expectedUpdatedAt: z.string().optional(),
@@ -62,6 +77,12 @@ export interface Glimmer {
 
 export type FoodItem = z.infer<typeof foodItem>;
 export type Symptom = z.infer<typeof symptom>;
+export type TakenMed = z.infer<typeof takenMed>;
+export interface Medication {
+  id: string;
+  name: string;
+  createdAt: string;
+}
 export type DayInput = z.infer<typeof dayInput>;
 export type ProfileInput = z.infer<typeof profileInput>;
 export type Day = Omit<DayInput, 'expectedUpdatedAt'> & { date: string; updatedAt?: string; updatedBy?: string };
@@ -115,5 +136,6 @@ export const emptyDay = (date: string, shared = false): Day => ({
   meals: { breakfast: [], lunch: [], dinner: [], snacks: [] },
   unwell: false,
   symptoms: [],
+  meds: [],
   shared,
 });

@@ -44,7 +44,7 @@
 /* Day sheet: bottom sheet on phones, side panel on desktop. */
 .jr-scrim { position: fixed; inset: 0; z-index: 50; background: rgba(4, 8, 16, 0.55); }
 .jr-sheet {
-  position: fixed; z-index: 51; left: 0; right: 0; bottom: 0; max-height: 92dvh; overflow: auto;
+  position: fixed; z-index: 51; left: 0; right: 0; bottom: 0; max-height: 75dvh; overflow: auto;
   background: var(--surface); border: 1px solid var(--border); border-radius: 28px 28px 0 0; padding: 20px 20px calc(24px + env(safe-area-inset-bottom));
 }
 @media (min-width: 900px) {
@@ -98,10 +98,9 @@
 .jr-sheet-empty { display: grid; place-items: center; min-height: 240px; }
 
 /* Food list + searchable combobox (replaces the old pill chips) */
-.jr-foodlist { list-style: none; margin: 0; padding: 0; display: grid; border: 1px solid var(--border); border-radius: 16px; overflow: hidden; }
-.jr-food { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; padding: 0 6px 0 14px; background: var(--surface-2); }
-.jr-food + .jr-food { border-top: 1px solid var(--border); }
-.jr-x { width: 36px; height: 36px; }
+.jr-foodlist { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.jr-food { display: inline-flex; align-items: center; max-width: 100%; gap: 2px; min-height: 36px; padding: 0 4px 0 14px; border-radius: 999px; font-size: 14px; background: color-mix(in oklab, var(--accent-fill) 14%, var(--surface)); border: 1px solid color-mix(in oklab, var(--accent) 35%, var(--border)); }
+.jr-x { width: 32px; height: 32px; flex: none; }
 .jr-combo { position: relative; }
 .jr-combo .input { padding-right: 14px; }
 .jr-list {
@@ -113,9 +112,9 @@
 .jr-opt.active { background: color-mix(in oklab, var(--accent-fill) 22%, var(--surface)); }
 .jr-opt.new { color: var(--accent); }
 .jr-opt.new strong { margin-left: 4px; color: var(--text); }
-.jr-food-text { flex: 1; text-align: left; min-height: 44px; background: none; border: 0; padding: 0; color: inherit; cursor: text; }
+.jr-food-text { text-align: left; min-height: 34px; overflow-wrap: anywhere; font-size: inherit; background: none; border: 0; padding: 0; color: inherit; cursor: text; }
 .jr-food-text:hover { text-decoration: underline dotted; text-underline-offset: 4px; }
-.jr-food-edit { flex: 1; min-height: 36px; margin: 4px 0; padding: 0 10px; border-radius: 10px; border: 1px solid var(--accent); background: var(--surface); }
+.jr-food-edit { flex: 1; min-width: 140px; min-height: 30px; margin: 2px 0; padding: 0 10px; border-radius: 999px; border: 1px solid var(--accent); background: var(--surface); }
 .jr-opt { justify-content: space-between; gap: 8px; }
 .jr-opt-forget { display: grid; place-items: center; width: 36px; height: 36px; margin-right: -6px; border: 0; border-radius: 50%; background: transparent; color: var(--muted); }
 .jr-opt-forget:hover, .jr-opt-forget:focus-visible { color: var(--unwell); background: var(--unwell-bg); }
@@ -173,3 +172,37 @@
 .gl-lightbox-x { position: absolute; top: 12px; right: 12px; color: #fff; }
 
 @media (prefers-reduced-motion: reduce) { .jr-glimmer { animation: none; } }
+
+/* Medicine cabinet: capsule pills, the dose stepper, and what was taken. */
+.md-root { position: fixed; inset: 0; z-index: 90; display: grid; place-items: end center; }
+@media (min-width: 900px) { .md-root { place-items: center; } }
+.md-scrim { position: absolute; inset: 0; background: rgba(4, 8, 16, 0.6); }
+.md-modal {
+  position: relative; width: min(100%, 460px); max-height: 75dvh; overflow: hidden; display: flex; flex-direction: column; gap: 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 28px 28px 0 0; padding: 20px 20px calc(24px + env(safe-area-inset-bottom));
+}
+@media (min-width: 900px) { .md-modal { border-radius: 28px; } }
+.md-modal .jr-sheet-head { margin-bottom: 0; flex: none; }
+.md-list { list-style: none; margin: 0; padding: 2px 0; display: grid; gap: 10px; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.md-foot { flex: none; display: grid; gap: 10px; }
+@media (min-width: 900px) { .md-modal { max-height: 85dvh; } }
+.md-pill { display: grid; gap: 4px; border-radius: 36px; border: 1px solid var(--border); background: var(--surface-2); padding: 4px; transition: background 0.2s, border-color 0.2s; }
+.md-pill.on { background: color-mix(in oklab, var(--accent-fill) 18%, var(--surface)); border-color: var(--accent); border-radius: 32px; }
+.md-row { display: flex; align-items: center; gap: 4px; }
+.md-head { flex: 1; min-height: 52px; display: flex; align-items: center; justify-content: center; gap: 12px; border: 0; background: transparent; color: var(--text); border-radius: 999px; }
+.md-name { text-transform: uppercase; letter-spacing: 0.04em; font-size: 18px; font-weight: 500; overflow-wrap: anywhere; }
+.md-dose { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 0 8px 8px; }
+.md-step { width: 52px; height: 44px; justify-self: center; border: 0; border-radius: 999px; background: transparent; color: var(--text); font-size: 28px; line-height: 1; }
+.md-step:hover:not(:disabled) { background: color-mix(in oklab, var(--accent-fill) 20%, transparent); }
+.md-step:disabled { opacity: 0.3; }
+.md-amount { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-display); font-size: 28px; min-width: 80px; justify-content: center; }
+.md-edit { justify-self: start; }
+.md-taken { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.md-taken-pill {
+  width: 100%; display: grid; gap: 6px; padding: 10px 18px; text-align: left; color: var(--text); border-radius: 28px;
+  background: color-mix(in oklab, var(--green) 26%, var(--surface)); border: 1px solid var(--green);
+}
+.md-taken-name { display: inline-flex; align-items: center; justify-content: center; gap: 10px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500; overflow-wrap: anywhere; }
+.md-taken-meta { display: flex; justify-content: space-between; font-size: 14px; padding: 0 12px; }
+.md-taken-dose { display: inline-flex; align-items: center; gap: 4px; }
+.md-open { justify-content: center; gap: 8px; }

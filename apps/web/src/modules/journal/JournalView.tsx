@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AnimatePresence } from 'motion/react';
 import type { ProfileSummary } from '@gravity/shared';
@@ -23,9 +23,11 @@ interface Props {
   initialTab?: Tab;
   /** Open the first sheet with the glimmer composer focused. */
   focusGlimmer?: boolean;
+  /** Open the first sheet with the medicine cabinet open. */
+  focusCabinet?: boolean;
 }
 
-export function JournalView({ profiles, family, defaultProfileId, inline, initialDate, initialTab = 'calendar', focusGlimmer }: Props) {
+export function JournalView({ profiles, family, defaultProfileId, inline, initialDate, initialTab = 'calendar', focusGlimmer, focusCabinet }: Props) {
   const api = useJournalApi();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [pid, setPid] = useState(defaultProfileId);
@@ -40,10 +42,15 @@ export function JournalView({ profiles, family, defaultProfileId, inline, initia
   const glimmerDates = useMemo(() => new Set((glimmerQ.data ?? []).map((g) => g.date)), [glimmerQ.data]);
   const sharedQ = useQuery({ queryKey: ['journal', 'shared', month], queryFn: () => api.shared(month), enabled: tab === 'family' });
   const names = useMemo(() => new Map(family.map((p) => [p.id, p])), [family]);
-  const close = () => setSelected(null);
+  // The cabinet opens automatically only on the first sheet (from the dashboard tile), never when you pick today again later.
+  const autoCabinet = useRef(!!focusCabinet);
+  const close = () => {
+    autoCabinet.current = false;
+    setSelected(null);
+  };
 
   const sheet = selected && (
-    <DaySheet key={selected.pid + selected.date} pid={selected.pid} date={selected.date} readOnly={selected.readOnly || !profiles.some((p) => p.id === selected.pid)} focusGlimmer={focusGlimmer && selected.date === initialDate} ownerName={names.get(selected.pid)?.name} onClose={close} />
+    <DaySheet key={selected.pid + selected.date} pid={selected.pid} date={selected.date} readOnly={selected.readOnly || !profiles.some((p) => p.id === selected.pid)} focusGlimmer={focusGlimmer && selected.date === initialDate} focusCabinet={autoCabinet.current && selected.date === initialDate} ownerName={names.get(selected.pid)?.name} onClose={close} />
   );
 
   return (
@@ -90,7 +97,7 @@ export function JournalView({ profiles, family, defaultProfileId, inline, initia
         {tab === 'family' && (
           <section className="card jr-family" aria-label="Shared with family">
             <h2>Shared with family</h2>
-            <p className="muted jr-lede">Days family members chose to share. Notes and meals stay private.</p>
+            <p className="muted jr-lede">Days family members chose to share, with symptoms and medicines. Notes and meals stay private.</p>
             {(sharedQ.data ?? []).length === 0 ? (
               <p className="jr-empty">Nothing shared this month.</p>
             ) : (

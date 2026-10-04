@@ -11,6 +11,7 @@ import {
   type BodySignals,
   type Day,
   type Glimmer,
+  type Medication,
   type GlimmerInput,
   type DayInput,
   type DaySummary,
@@ -45,6 +46,10 @@ export interface JournalApi {
   deleteGlimmer(pid: string, date: string, id: string): Promise<void>;
   glimmerFeed(): Promise<Glimmer[]>;
   glimmerImage(id: string, size: 'thumb' | 'full'): Promise<string>;
+  /** The family medicine cabinet (names only), shared by everyone. */
+  cabinet(): Promise<Medication[]>;
+  addMed(name: string): Promise<Medication>;
+  deleteMed(id: string): Promise<void>;
 }
 
 /** Glimmer images never change, so they are cached forever once fetched. */
@@ -80,6 +85,11 @@ export function useHttpJournalApi(): JournalApi {
       },
       glimmerFeed: () => f('/api/journal/glimmers/feed'),
       glimmerImage: async (id, size) => (await f<{ dataUrl: string }>('/api/journal/glimmers/' + id + '/image?size=' + size)).dataUrl,
+      cabinet: () => f('/api/journal/cabinet'),
+      addMed: (name) => f('/api/journal/cabinet', { method: 'POST', body: { name } }),
+      deleteMed: async (id) => {
+        await f('/api/journal/cabinet/' + id, { method: 'DELETE' });
+      },
     }),
     [f],
   );
@@ -100,6 +110,7 @@ export function createDemoApi(today: string): JournalApi {
     { id: 'demo-1', profileId: 'demo', date: addDays(today, -1), caption: 'Warm sun on the porch with coffee', hasImage: false, createdAt: addDays(today, -1) + 'T18:00:00Z' },
     { id: 'demo-2', profileId: 'demo', date: addDays(today, -4), caption: 'The kids built a blanket fort', hasImage: false, createdAt: addDays(today, -4) + 'T18:00:00Z' },
   ];
+  const cabinet: Medication[] = ['Ibuprofen', 'Tylenol', 'Allergy tablet'].map((name, i) => ({ id: 'demo-med-' + i, name, createdAt: today + 'T08:00:00Z' }));
   return {
     async listMonth(_pid, month) {
       return [...days.values()].filter((d) => d.date.startsWith(month)).map(summarize);
@@ -163,6 +174,18 @@ export function createDemoApi(today: string): JournalApi {
     },
     async glimmerImage() {
       throw new Error('No image in the demo');
+    },
+    async cabinet() {
+      return [...cabinet].sort((a, b) => a.name.localeCompare(b.name));
+    },
+    async addMed(name) {
+      const m: Medication = { id: 'demo-med-' + Math.random().toString(36).slice(2), name, createdAt: new Date().toISOString() };
+      cabinet.push(m);
+      return m;
+    },
+    async deleteMed(id) {
+      const i = cabinet.findIndex((m) => m.id === id);
+      if (i >= 0) cabinet.splice(i, 1);
     },
   };
 }

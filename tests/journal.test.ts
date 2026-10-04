@@ -204,3 +204,56 @@ describe('glimmers', () => {
     expect(((await gfeed('dad')).body as any[]).map((g) => g.date)).toEqual(['2026-09-20', '2026-08-30']);
   });
 });
+
+describe('medicine cabinet', () => {
+  const addMed = (who: Who, name: unknown) => app.journal(who, 'POST', '/cabinet', { name });
+  const cabinet = (who: Who) => app.journal(who, 'GET', '/cabinet');
+  const tm = (over: object = {}) => ({ id: 'm1', name: 'Ibuprofen', dose: 1.5, time: '09:03', ...over });
+
+  it('any family member can add, list and remove medicines, and strangers cannot', async () => {
+    const added = await addMed('mom', '  Ibuprofen ');
+    expect(added.status).toBe(201);
+    expect((added.body as any).name).toBe('Ibuprofen');
+    await addMed('dad', 'Allergy tablet');
+    expect(((await cabinet('teen')).body as any[]).map((m) => m.name)).toEqual(['Allergy tablet', 'Ibuprofen']);
+    expect((await app.journal('teen', 'DELETE', '/cabinet/' + (added.body as any).id)).status).toBe(204);
+    expect(((await cabinet('mom')).body as any[]).map((m) => m.name)).toEqual(['Allergy tablet']);
+    expect((await cabinet('stranger')).status).toBe(403);
+    expect((await addMed('stranger', 'X')).status).toBe(403);
+  });
+
+  it('rejects blank and duplicate names', async () => {
+    expect((await addMed('mom', '   ')).status).toBe(400);
+    expect((await addMed('mom', 'Tylenol')).status).toBe(201);
+    expect((await addMed('dad', 'tylenol')).status).toBe(409);
+  });
+
+  it('keeps taken medicines on a day, even after the medicine leaves the cabinet', async () => {
+    const m = (await addMed('mom', 'Ibuprofen')).body as any;
+    await put('mom', momPid, '2026-09-10', day({ meds: [tm({ id: m.id })] }));
+    await app.journal('mom', 'DELETE', '/cabinet/' + m.id);
+    expect(((await get('mom', momPid, '2026-09-10')).body as any).meds).toEqual([tm({ id: m.id })]);
+  });
+
+  it('validates doses: steps of 0.5, at least 0.5', async () => {
+    expect((await put('mom', momPid, '2026-09-10', day({ meds: [tm({ dose: 0.3 })] }))).status).toBe(400);
+    expect((await put('mom', momPid, '2026-09-10', day({ meds: [tm({ dose: 0 })] }))).status).toBe(400);
+    expect((await put('mom', momPid, '2026-09-10', day({ meds: [tm({ time: 'noon' })] }))).status).toBe(400);
+    expect((await put('mom', momPid, '2026-09-10', day({ meds: [tm({ dose: 0.5 })] }))).status).toBe(200);
+  });
+
+  it('days saved without medicines read back an empty list', async () => {
+    const { meds: _m, ...old } = day();
+    expect((await put('mom', momPid, '2026-09-10', old)).status).toBe(200);
+    expect(((await get('mom', momPid, '2026-09-10')).body as any).meds).toEqual([]);
+    expect(((await get('mom', momPid, '2026-09-12')).body as any).meds).toEqual([]);
+  });
+
+  it('family sees medicines on a shared day, but never meals or notes', async () => {
+    await put('mom', momPid, '2026-09-10', day({ shared: true, notes: 'n', meals: meal('Soup'), meds: [tm()] }));
+    const seen = (await get('dad', momPid, '2026-09-10')).body as any;
+    expect(seen.meds).toEqual([tm()]);
+    expect(seen.notes).toBeUndefined();
+    expect(seen.meals.breakfast).toEqual([]);
+  });
+});
