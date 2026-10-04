@@ -96,13 +96,13 @@ describe('infra: nobody but the family', () => {
 
   it('never deletes family data with the stack, and stays pay-per-request', () => {
     const tables = t.findResources('AWS::DynamoDB::Table');
-    expect(Object.keys(tables)).toHaveLength(3);
+    expect(Object.keys(tables)).toHaveLength(4);
     for (const r of Object.values(tables) as any[]) {
       expect(r.DeletionPolicy).toBe('Retain');
       expect(r.Properties.BillingMode).toBe('PAY_PER_REQUEST');
       expect(r.Properties.PointInTimeRecoverySpecification.PointInTimeRecoveryEnabled).toBe(true);
     }
-    expect(Object.values(tables).map((r: any) => r.Properties.TableName).sort()).toEqual(['gravity-core', 'gravity-health', 'gravity-journal']);
+    expect(Object.values(tables).map((r: any) => r.Properties.TableName).sort()).toEqual(['gravity-core', 'gravity-health', 'gravity-journal', 'gravity-meals']);
   });
 
   it('runs cheap arm64 Node 22 Lambdas and nothing that bills by the hour', () => {

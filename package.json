@@ -24,7 +24,8 @@
     "test:e2e": "playwright test",
     "deploy": "npm run build -w apps/web && npm run deploy -w infra",
     "synth": "npm run build -w apps/web && npm run synth -w infra",
-    "verify": "npm run typecheck && vitest run && playwright test"
+    "verify": "npm run typecheck && vitest run && playwright test",
+    "tandoor:export": "tsx scripts/tandoor-export.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

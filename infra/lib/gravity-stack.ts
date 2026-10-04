@@ -263,6 +263,10 @@ export class GravityStack extends Stack {
     photos.grantReadWrite(journal.fn);
     journal.fn.addEnvironment('PHOTOS_BUCKET', photos.bucketName);
 
+    // Meal planner: the recipe library (imported from a Tandoor export, never fetched live), the plan and the grocery list.
+    // Tandoor stays on the NAS; nothing in AWS can reach it, and no Tandoor credentials ever come here.
+    new GravityService(this, 'Meals', { name: 'meals', api, authorizer, allowlist, timeout: Duration.seconds(28) });
+
     // ---- Publish the SPA + runtime config ----------------------------------------------------------------------
     const webDist = props.webDist && fs.existsSync(props.webDist) ? props.webDist : path.join(REPO_ROOT, 'infra', 'empty-site');
     fs.mkdirSync(webDist, { recursive: true });

@@ -8,6 +8,7 @@ import { Dashboard } from './pages/Dashboard';
 import { HealthCallback } from './pages/HealthCallback';
 import { HealthPage } from './pages/HealthPage';
 import { JournalPage } from './pages/JournalPage';
+import { MealsPage } from './pages/MealsPage';
 import { Login } from './pages/Login';
 import { Profiles } from './pages/Profiles';
 
@@ -73,6 +74,7 @@ export function App() {
           <Route index element={<Dashboard />} />
           <Route path="journal" element={<JournalPage />} />
           <Route path="health" element={<HealthPage />} />
+          <Route path="meals" element={<MealsPage />} />
           <Route path="health/callback" element={<HealthCallback />} />
           <Route path="profiles" element={<Profiles />} />
         </Route>

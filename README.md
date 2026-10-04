@@ -68,3 +68,16 @@ One-time setup, after the normal deploy above:
 How it stays private: every request goes through the same JWT authorizer as everything else (there is no unauthenticated route); health data is never part of the shared family feed and only a profile's managers can read it; refresh tokens live in SSM SecureStrings under `/gravity/health/tokens/` (free, unlike Secrets Manager) and the function may only touch that prefix; the scheduled sync skips anyone removed from the allowlist. *Disconnect* revokes access at Google and deletes every imported day. Google refresh tokens can lapse; the page then offers *Reconnect*.
 
 Locally (`npm run local`) a fake Google stands in: *Connect* bounces straight back and invents believable numbers, so the whole flow works with no credentials.
+
+## Meal planner and Tandoor
+
+Meals has three tabs: Plan (breakfast, lunch, dinner, snack, dessert per day), Grocery (a saved list you tap on and off) and Recipes.
+
+Tandoor lives on your NAS, so Gravity in AWS never connects to it. Recipes are copied across with a file instead, which means Tailscale only needs to be on for the export:
+
+```bash
+# Tandoor > Settings > API: create a token. Then, with Tailscale on:
+TANDOOR_URL=https://your-nas.your-tailnet.ts.net TANDOOR_TOKEN=tda_xxx npm run tandoor:export
+```
+
+On Windows PowerShell set the two variables first with `$env:TANDOOR_URL = '...'; $env:TANDOOR_TOKEN = '...'`. Then open Meals > Recipes > Import from Tandoor and pick `tandoor-recipes.json`. Re-import whenever your recipes change: it updates existing recipes and drops ones you deleted in Tandoor, and leaves recipes added by hand alone. Planned meals keep a copy of their ingredients, so they never break.

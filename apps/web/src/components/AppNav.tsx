@@ -8,6 +8,7 @@ import { Icon, type IconName } from './Icon';
 const LINKS: { to: string; label: string; icon: IconName; end?: boolean }[] = [
   { to: '/app', label: 'Home', icon: 'home', end: true },
   { to: '/app/journal', label: 'Journal', icon: 'book' },
+  { to: '/app/meals', label: 'Meals', icon: 'bowl' },
   { to: '/app/health', label: 'Health', icon: 'heart' },
   { to: '/app/profiles', label: 'Family', icon: 'users' },
 ];

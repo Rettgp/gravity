@@ -7,6 +7,7 @@ import { dirname } from 'node:path';
 import { addDays, FilePhotos, generateDemoDays, MemoryDb, normalizeEmail } from '@gravity/shared/server';
 import { buildCoreRouter } from '../services/core/src/router';
 import { buildJournalRouter } from '../services/journal/src/router';
+import { buildMealsRouter } from '../services/meals/src/router';
 import { FakeGoogle, fakeDay } from '../services/health/src/fake';
 import { buildHealthRouter } from '../services/health/src/router';
 import { MemoryTokens } from '../services/health/src/tokens';
@@ -22,6 +23,7 @@ const db = new MemoryDb(FILE);
 const allowlist = async () => ALLOWED;
 const core = buildCoreRouter({ db, table: 'core', allowlist });
 const journal = buildJournalRouter({ db, table: 'journal', coreTable: 'core', healthTable: 'health', photos: new FilePhotos(dirname(FILE) + '/photos'), allowlist });
+const meals = buildMealsRouter({ db, table: 'meals', allowlist });
 // No Google in local mode: the fake bounces straight back as if consent was granted, and invents believable numbers.
 const health = buildHealthRouter({
   db,
@@ -97,6 +99,6 @@ createServer(async (req, res) => {
     return send(res, 200, { ok: true });
   }
 
-  const out = url.pathname.startsWith('/api/core') ? await core(r) : url.pathname.startsWith('/api/journal') ? await journal(r) : url.pathname.startsWith('/api/health') ? await health(r) : { status: 404, body: { error: 'Not found' } };
+  const out = url.pathname.startsWith('/api/core') ? await core(r) : url.pathname.startsWith('/api/journal') ? await journal(r) : url.pathname.startsWith('/api/health') ? await health(r) : url.pathname.startsWith('/api/meals') ? await meals(r) : { status: 404, body: { error: 'Not found' } };
   send(res, out.status, out.body);
 }).listen(PORT, '127.0.0.1', () => console.log('[gravity] local API on http://127.0.0.1:' + PORT + ' (allowed: ' + ALLOWED.join(', ') + ')'));

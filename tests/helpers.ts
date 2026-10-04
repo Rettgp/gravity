@@ -1,6 +1,7 @@
 import { MemoryDb, MemoryPhotos, type Req, type DayInput } from '@gravity/shared/server';
 import { buildCoreRouter } from '../services/core/src/router';
 import { buildJournalRouter } from '../services/journal/src/router';
+import { buildMealsRouter } from '../services/meals/src/router';
 import { FakeGoogle } from '../services/health/src/fake';
 import { buildHealthRouter } from '../services/health/src/router';
 import { MemoryTokens } from '../services/health/src/tokens';
@@ -19,6 +20,7 @@ export function makeApp(allowed: string[] = FAMILY) {
   const allowlist = async () => allowed;
   const core = buildCoreRouter({ db, table: 'core', allowlist });
   const journal = buildJournalRouter({ db, table: 'journal', coreTable: 'core', healthTable: 'health', photos: new MemoryPhotos(), allowlist, now: () => new Date('2026-09-28T12:00:00Z') });
+  const meals = buildMealsRouter({ db, table: 'meals', allowlist, now: () => new Date('2026-09-28T12:00:00Z') });
   const google = new FakeGoogle();
   const tokens = new MemoryTokens();
   let clock = new Date('2026-09-28T12:00:00Z');
@@ -44,6 +46,7 @@ export function makeApp(allowed: string[] = FAMILY) {
     google,
     tokens,
     setNow: (iso: string) => void (clock = new Date(iso)),
+    meals: (who: Who | null, m: string, p: string, b?: unknown, q?: Record<string, string>) => call(meals, who, m, '/api/meals' + p, b, q),
     journal: (who: Who | null, m: string, p: string, b?: unknown, q?: Record<string, string>) => call(journal, who, m, '/api/journal' + p, b, q),
   };
 }

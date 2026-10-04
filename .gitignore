@@ -12,3 +12,6 @@ test-results/
 playwright-report/
 infra/empty-site/
 .cdk-outputs.json
+tandoor-recipes.json
+
+scripts/*.local.ps1
