@@ -450,3 +450,58 @@ test.describe('medicine cabinet', () => {
     await expect(page.getByRole('dialog', { name: 'Medicine cabinet' })).toHaveCount(0);
   });
 });
+
+test.describe('edit a taken medicine', () => {
+  test('press and hold opens the editor to change dose and time, and it persists', async ({ page }, info) => {
+    const who = info.project.name === 'mobile' ? 'teen' : 'mom';
+    const name = 'Holdtest ' + info.project.name;
+    await signIn(page, who);
+    await page.goto('/app/journal?date=' + today);
+    const sheet = page.getByRole('dialog', { name: /^Journal for/ });
+    await sheet.getByRole('button', { name: 'Open medicine cabinet' }).click();
+    const cab = page.getByRole('dialog', { name: 'Medicine cabinet' });
+    await cab.getByRole('textbox', { name: 'Add medication' }).fill(name);
+    await cab.getByRole('textbox', { name: 'Add medication' }).press('Enter');
+    await cab.getByRole('button', { name: new RegExp(name, 'i'), pressed: false }).click();
+    await cab.getByRole('button', { name: 'Close medicine cabinet' }).click();
+
+    // A quick tap still opens the cabinet; a long press opens the editor instead.
+    const pill = sheet.locator('.md-taken-pill', { hasText: name });
+    await pill.scrollIntoViewIfNeeded();
+    await page.waitForTimeout(400); // let the sheet and list settle so the press lands on the pill
+    const box = (await pill.boundingBox())!;
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    const edit = page.getByRole('dialog', { name: 'Edit ' + name });
+    await expect(edit).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Medicine cabinet' })).toHaveCount(0);
+    await edit.getByRole('button', { name: 'Increase dose of ' + name }).click();
+    await edit.getByRole('button', { name: 'Increase dose of ' + name }).click();
+    await edit.getByLabel('Time taken').click();
+    await page.keyboard.type('645');
+    await expect(edit).toContainText('Shown as 6:45');
+    await edit.getByRole('radio', { name: 'PM' }).click();
+    await expect(edit).toContainText('Shown as 6:45pm');
+    await edit.getByRole('radio', { name: 'AM' }).click();
+    await page.screenshot({ path: ART + '/mededit-' + info.project.name + '.png' });
+    await edit.getByRole('button', { name: 'Done' }).click();
+    await expect(pill).toContainText('2');
+    await expect(pill).toContainText('6:45am');
+    await saved(page);
+    await page.reload();
+    await expect(page.getByRole('dialog', { name: /^Journal for/ }).locator('.md-taken-pill', { hasText: name })).toContainText('6:45am');
+
+    // Remove from the editor.
+    const again = page.getByRole('dialog', { name: /^Journal for/ }).locator('.md-taken-pill', { hasText: name });
+    await again.scrollIntoViewIfNeeded();
+    const b2 = (await again.boundingBox())!;
+    await page.mouse.move(b2.x + b2.width / 2, b2.y + b2.height / 2);
+    await page.mouse.down();
+    await page.waitForTimeout(700);
+    await page.mouse.up();
+    await page.getByRole('dialog', { name: 'Edit ' + name }).getByRole('button', { name: 'Remove' }).click();
+    await expect(again).toHaveCount(0);
+  });
+});

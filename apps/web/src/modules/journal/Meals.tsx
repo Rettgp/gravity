@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { MEAL_KEYS, type MealKey, type DayInput } from '@gravity/shared';
-import { Icon } from '../../components/Icon';
+import { Icon, type IconName } from '../../components/Icon';
 import { FoodCombobox } from './FoodCombobox';
+import { SectionHead } from './SectionHead';
 
+const ICON: Record<MealKey, IconName> = { breakfast: 'sun', lunch: 'fork', dinner: 'moon', snacks: 'bowl' };
 const LABEL: Record<MealKey, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snacks: 'Snacks' };
 
 interface Props {
@@ -29,7 +31,7 @@ export function Meals({ meals, suggestions, readOnly, onAdd, onRemove, onEdit, o
     <>
       {MEAL_KEYS.map((k) => (
         <section key={k} className="jr-block" aria-label={LABEL[k]}>
-          <h3>{LABEL[k]}</h3>
+          <SectionHead icon={ICON[k]}>{LABEL[k]}</SectionHead>
           {meals[k].length > 0 && (
             <ul className="jr-foodlist">
               {meals[k].map((f, i) => {

@@ -9,8 +9,10 @@ import { useJournalApi } from './api';
 import { BodyStrip } from './BodyStrip';
 import { Glimmers } from './Glimmers';
 import { Meals } from './Meals';
+import { MedEdit } from './MedEdit';
 import { MedicineCabinet } from './MedicineCabinet';
 import { Medicines } from './Medicines';
+import { SectionHead } from './SectionHead';
 import { Symptoms } from './Symptoms';
 import { useDayDraft } from './useDayDraft';
 
@@ -33,6 +35,7 @@ export function DaySheet({ pid, date, readOnly, ownerName, focusGlimmer, focusCa
   const closeRef = useRef<HTMLButtonElement>(null);
   const qc = useQueryClient();
   const [forgetting, setForgetting] = useState<string | null>(null);
+  const [editingMed, setEditingMed] = useState<string | null>(null);
   const [cabinetOpen, setCabinetOpen] = useState(!!focusCabinet && !readOnly);
 
   useEffect(() => {
@@ -70,6 +73,13 @@ export function DaySheet({ pid, date, readOnly, ownerName, focusGlimmer, focusCa
     }));
   const setDose = (id: string, dose: number) =>
     change((d) => ({ ...d, meds: d.meds.map((t) => (t.id === id ? { ...t, dose: Math.min(MED_DOSE_MAX, Math.max(MED_DOSE_STEP, dose)) } : t)) }));
+
+  const setMedTime = (id: string, time: string) => change((d) => ({ ...d, meds: d.meds.map((t) => (t.id === id ? { ...t, time } : t)) }));
+  const removeMed = (id: string) => {
+    change((d) => ({ ...d, meds: d.meds.filter((t) => t.id !== id) }));
+    setEditingMed(null);
+  };
+  const editedMed = draft?.meds.find((t) => t.id === editingMed);
 
   const statusText = readOnly
     ? 'Shared by ' + (ownerName ?? 'family') + ' - view only'
@@ -118,14 +128,12 @@ export function DaySheet({ pid, date, readOnly, ownerName, focusGlimmer, focusCa
               <button className="switch" role="switch" aria-checked={draft.unwell} aria-labelledby="unwell-label" disabled={readOnly} onClick={() => change((d) => ({ ...d, unwell: !d.unwell }))} />
             </div>
             {draft.unwell && <Symptoms symptoms={draft.symptoms} readOnly={readOnly} onToggle={toggleSymptom} onSeverity={setSeverity} />}
-            {(!readOnly || draft.meds.length > 0) && <Medicines meds={draft.meds} readOnly={readOnly} onOpen={() => setCabinetOpen(true)} />}
+            {(!readOnly || draft.meds.length > 0) && <Medicines meds={draft.meds} readOnly={readOnly} onOpen={() => setCabinetOpen(true)} onEdit={setEditingMed} />}
             {!readOnly && <Meals meals={draft.meals} suggestions={suggestions} readOnly={readOnly} onAdd={addFood} onRemove={removeFood} onEdit={editFood} onForget={setForgetting} />}
             {!readOnly && (
               <section className="jr-block">
-                <label className="field">
-                  Notes
-                  <textarea className="input" value={draft.notes ?? ''} maxLength={2000} placeholder="Sleep, stress, activity, anything else..." onChange={(e) => change((d) => ({ ...d, notes: e.target.value }))} />
-                </label>
+                <SectionHead icon="book">Notes</SectionHead>
+                <textarea aria-label="Notes" className="input" value={draft.notes ?? ''} maxLength={2000} placeholder="Sleep, stress, activity, anything else..." onChange={(e) => change((d) => ({ ...d, notes: e.target.value }))} />
               </section>
             )}
             {!readOnly && (
@@ -142,6 +150,9 @@ export function DaySheet({ pid, date, readOnly, ownerName, focusGlimmer, focusCa
         )}
       </motion.aside>
       {cabinetOpen && !readOnly && draft && <MedicineCabinet taken={draft.meds} onToggle={toggleMed} onDose={setDose} onClose={() => setCabinetOpen(false)} />}
+      {editedMed && !readOnly && (
+        <MedEdit med={editedMed} onDose={(v) => setDose(editedMed.id, v)} onTime={(v) => setMedTime(editedMed.id, v)} onRemove={() => removeMed(editedMed.id)} onClose={() => setEditingMed(null)} />
+      )}
       {forgetting && (
         <ConfirmDialog
           danger

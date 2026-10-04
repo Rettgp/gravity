@@ -199,10 +199,44 @@
 .md-edit { justify-self: start; }
 .md-taken { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .md-taken-pill {
-  width: 100%; display: grid; gap: 6px; padding: 10px 18px; text-align: left; color: var(--text); border-radius: 28px;
+  width: 100%; display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 18px; text-align: left; color: var(--text); border-radius: 999px;
   background: color-mix(in oklab, var(--green) 26%, var(--surface)); border: 1px solid var(--green);
 }
-.md-taken-name { display: inline-flex; align-items: center; justify-content: center; gap: 10px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500; overflow-wrap: anywhere; }
-.md-taken-meta { display: flex; justify-content: space-between; font-size: 14px; padding: 0 12px; }
+.md-taken-name { flex: 1 1 auto; min-width: 0; display: inline-flex; align-items: center; gap: 10px; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 500; }
+.md-taken-name svg { flex: none; }
+.md-taken-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.md-taken-meta { flex: none; display: inline-flex; align-items: center; gap: 12px; font-size: 14px; white-space: nowrap; }
 .md-taken-dose { display: inline-flex; align-items: center; gap: 4px; }
 .md-open { justify-content: center; gap: 8px; }
+
+/* Press-and-hold edit sheet for a taken medicine */
+.md-taken-pill { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; transition: transform 0.15s var(--ease-out); }
+.md-taken-pill:active { transform: scale(0.98); }
+.md-hint { font-size: 13px; }
+.md-edit-sheet { gap: 18px; overflow: auto; }
+.md-grab { align-self: center; width: 40px; height: 5px; border-radius: 999px; background: var(--border); margin-top: -8px; }
+.md-edit-head { display: flex; align-items: center; justify-content: center; gap: 10px; }
+.md-edit-head h2 { font-size: 22px; text-transform: uppercase; letter-spacing: 0.04em; font-family: var(--font-ui); font-weight: 500; overflow-wrap: anywhere; text-align: center; }
+.md-field { display: grid; gap: 8px; padding: 14px; border-radius: 24px; background: var(--surface-2); border: 1px solid var(--border); }
+.md-label { font-size: 13px; color: var(--muted); font-weight: 500; }
+.md-bigstep { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; }
+.md-bigstep button { width: 64px; height: 56px; justify-self: center; border: 0; border-radius: 999px; background: color-mix(in oklab, var(--accent-fill) 18%, var(--surface)); color: var(--text); font-size: 30px; line-height: 1; }
+.md-bigstep button:active:not(:disabled) { transform: scale(0.94); }
+.md-bigstep button:disabled { opacity: 0.3; }
+.md-bigstep .md-amount { font-size: 40px; min-width: 110px; }
+.md-timerow { display: flex; gap: 10px; align-items: center; }
+.md-time { flex: 1; min-height: 56px; font-size: 24px; font-family: var(--font-display); text-align: center; border-radius: 999px; }
+.md-actions { display: grid; grid-template-columns: auto 1fr; gap: 10px; }
+.md-actions .btn { min-height: 52px; justify-content: center; gap: 8px; }
+.md-remove { color: var(--unwell); }
+.md-time { min-width: 0; letter-spacing: 0.02em; }
+.md-ampm { display: inline-grid; grid-auto-flow: column; padding: 4px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); }
+.md-ampm button { min-width: 54px; min-height: 48px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-weight: 600; font-size: 15px; }
+.md-ampm button.on { background: var(--accent-fill); color: var(--on-accent); }
+.md-now { justify-self: start; min-height: 40px; }
+
+/* Day sheet sections: clear separation, bigger headings with an icon chip. */
+.jr-sheet-body { gap: 26px; }
+.jr-block:not(.gl-sheet) { border-top: 1px solid var(--border); padding-top: 22px; gap: 14px; }
+.jr-block h3.jr-h { display: flex; align-items: center; gap: 12px; font-size: 19px; font-family: var(--font-display); font-weight: 600; letter-spacing: -0.01em; }
+.jr-h-ico { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 12px; color: var(--accent); background: color-mix(in oklab, var(--accent-fill) 16%, var(--surface)); }

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { tempLabel, tempValue, useTempUnit } from '../../lib/units';
 import { useJournalApi } from './api';
+import { SectionHead } from './SectionHead';
 
 const dur = (min: number) => `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`;
 
@@ -20,7 +21,7 @@ export function BodyStrip({ pid, date }: { pid: string; date: string }) {
   if (items.length === 0) return null;
   return (
     <section className="jr-block jr-body" aria-label="Body numbers for this day">
-      <h3>Body</h3>
+      <SectionHead icon="heart">Body</SectionHead>
       <ul className="jr-body-list">
         {items.map(([k, v]) => (
           <li key={k}>

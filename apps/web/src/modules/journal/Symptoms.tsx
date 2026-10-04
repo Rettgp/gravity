@@ -1,5 +1,6 @@
 import type { Symptom } from '@gravity/shared';
 import { AddInput } from './AddInput';
+import { SectionHead } from './SectionHead';
 
 const COMMON = ['Nausea', 'Stomach ache', 'Headache', 'Bloating', 'Diarrhea', 'Fatigue', 'Fever', 'Rash', 'Cough'];
 
@@ -14,7 +15,7 @@ export function Symptoms({ symptoms, readOnly, onToggle, onSeverity }: Props) {
   const has = (n: string) => symptoms.some((s) => s.name.toLowerCase() === n.toLowerCase());
   return (
     <section className="jr-block" aria-label="Symptoms">
-      <h3>Symptoms</h3>
+      <SectionHead icon="thermo">Symptoms</SectionHead>
       <div className="jr-chips">
         {COMMON.map((n) => (
           <button key={n} className="chip" aria-pressed={has(n)} disabled={readOnly} onClick={() => onToggle(n)}>
