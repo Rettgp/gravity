@@ -149,7 +149,8 @@ describe('infra: nobody but the family', () => {
 
   it('routes the planner and trips services behind the JWT authorizer', () => {
     const routes = Object.values(t.findResources('AWS::ApiGatewayV2::Route')).map((r: any) => r.Properties);
-    for (const key of ['ANY /api/planner/{proxy+}', 'ANY /api/trips/{proxy+}']) {
+    // The bare prefix needs its own route: {proxy+} never matches GET/POST /api/trips.
+    for (const key of ['ANY /api/planner/{proxy+}', 'ANY /api/trips/{proxy+}', 'ANY /api/planner', 'ANY /api/trips']) {
       const r = routes.find((x: any) => x.RouteKey === key);
       expect(r, key).toBeDefined();
       expect(r.AuthorizationType).toBe('JWT');

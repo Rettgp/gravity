@@ -71,5 +71,12 @@ export class GravityService extends Construct {
       integration: new HttpLambdaIntegration(name + 'Integration', this.fn),
       authorizer,
     });
+    // {proxy+} never matches the bare prefix, and collection endpoints like GET/POST /api/trips live there.
+    api.addRoutes({
+      path: '/api/' + name,
+      methods: [HttpMethod.ANY],
+      integration: new HttpLambdaIntegration(name + 'RootIntegration', this.fn),
+      authorizer,
+    });
   }
 }

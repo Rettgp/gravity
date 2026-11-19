@@ -201,7 +201,8 @@ const EXEMPT =
   'button, select, option, script, style, .event-ctrls, .reminder-add-row, .reminder-bullet, .date-tag, .day-no, .glance-cta, .glance-card h3, .next-up, .ticket-badge, .ticket-check, .pack-progress, ' +
   '.overview-grid h3, .card:has(#todoItems) > h3, [data-section="grocery"] .section-sub, [data-section="packing"] .section-sub, [data-section="cost"] .section-sub, ' +
   '[data-section="logistics"] .card:has(.ticket-item) > .section-sub, [data-section="logistics"] .card:has(.ticket-item) > h3, [data-section="logistics"] .section-head h2, [data-section="overview"] .section-head h2, [data-section="dining"] .section-head h2, ' +
-  '[data-section="grocery"] .section-head h2, [data-section="packing"] .section-head h2, [data-section="cost"] .section-head h2';
+  '[data-section="grocery"] .section-head h2, [data-section="packing"] .section-head h2, [data-section="cost"] .section-head h2, ' +
+  '.card:has(#backupStatus)'; // the "Copy my trip data" backup card: page controls, not trip content
 
 /** Runs in the page with the section on screen: every visible text node and visible input value, split into kept and exempt. */
 const visibleTexts = ({ id, exempt }: { id: string; exempt: string }): { kept: string[]; exempt: string[] } => {
