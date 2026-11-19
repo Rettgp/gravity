@@ -111,11 +111,20 @@
 /* Forms in sheets */
 .tr-form { display: grid; gap: 14px; }
 .tr-form label.field { color: var(--tr-muted); }
-.tr-fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; min-width: 0; }
-.tr-fieldset legend { font-size: 13px; font-weight: 500; color: var(--tr-muted); margin-bottom: 6px; padding: 0; }
-.tr-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.tr-pick { min-height: 44px; cursor: pointer; }
-.tr-pick input { width: 18px; height: 18px; accent-color: var(--accent-fill); }
+/* New trip: titled sections, one per question, each a quiet glass panel. */
+.tr-new { gap: 14px; }
+.tr-new-sec { display: grid; gap: 12px; padding: 14px; border-radius: var(--radius-card); background: var(--glass-bg-2); border: 1px solid var(--glass-border); min-width: 0; }
+.tr-new-sec h3 { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: color-mix(in oklab, var(--accent) 70%, var(--text)); }
+.tr-new-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tr-new label.field { gap: 6px; }
+.tr-new label.field > span:first-child { color: var(--text); font-weight: 600; }
+.tr-req { color: var(--unwell); }
+.tr-field-err { color: var(--unwell); font-size: 12.5px; font-weight: 500; }
+.tr-new .input[aria-invalid='true'] { border-color: var(--unwell); }
+.tr-new .tr-two > * { min-width: 0; }
+.tr-pick { min-height: 40px; gap: 6px; padding: 0 14px; cursor: pointer; }
+.tr-add-btn { flex: none; width: 44px; height: 44px; border-radius: var(--radius-ctl); background: var(--glass-bg-2); border: 1px solid var(--tr-line); color: var(--text); }
+.tr-add-btn:disabled { opacity: 0.45; }
 
 /* Notice: small, never blocks. Sits above the phone tab bar. */
 .tr-toast {

@@ -54,6 +54,10 @@ button.chip:hover { border-color: var(--glass-highlight); }
 .input::placeholder { color: var(--muted); }
 textarea.input { min-height: 88px; resize: vertical; }
 label.field { display: grid; gap: 6px; font-size: 13px; color: var(--muted); font-weight: 500; }
+/* iOS Safari sizes date and time fields to their own content and lets them spill out of their column; make them fill it like any input. */
+input.input:is([type='date'], [type='time'], [type='datetime-local']) { display: block; width: 100%; min-width: 0; text-align: left; }
+@supports (-webkit-touch-callout: none) { input.input:is([type='date'], [type='time'], [type='datetime-local']) { -webkit-appearance: none; appearance: none; } }
+input.input::-webkit-date-and-time-value { text-align: left; }
 
 /* Toggle switch (role=switch button). */
 .switch { position: relative; width: 52px; height: 30px; border-radius: 999px; border: 1px solid var(--glass-border); background: var(--glass-bg-2); padding: 0; flex: none; transition: background 0.2s; }

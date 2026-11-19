@@ -119,6 +119,14 @@ body .jr-sheet {
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
   backdrop-filter: blur(var(--glass-blur)) saturate(160%);
 }
+/* Sticky action bar at the bottom of any sheet: Cancel on the left, the main action on the right. The margins cancel the sheet's padding. */
+.sheet-foot {
+  position: sticky; z-index: 2; bottom: calc(-1 * (24px + env(safe-area-inset-bottom))); margin: 18px -20px calc(-24px - env(safe-area-inset-bottom));
+  display: flex; gap: 10px; align-items: center; padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--glass-border); background: color-mix(in oklab, var(--surface-2) 80%, transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur)); backdrop-filter: blur(var(--glass-blur));
+}
+.sheet-foot .spacer { flex: 1; }
 
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .glass { background: color-mix(in oklab, var(--surface) 92%, transparent); box-shadow: none; }

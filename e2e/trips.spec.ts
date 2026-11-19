@@ -42,7 +42,7 @@ test.describe('trips', () => {
     await goTo(page, 'Trips');
     await page.getByRole('button', { name: 'New trip' }).click();
     const sheet = page.getByRole('dialog', { name: 'New trip' });
-    await sheet.getByLabel('Name', { exact: true }).fill(name);
+    await sheet.getByLabel('Name *', { exact: true }).fill(name); // the asterisk marks it required
     await sheet.getByLabel('Destination').fill('Testville');
     await sheet.getByLabel('Start date').fill(addDays(isoToday(), 20));
     await sheet.getByLabel('End date').fill(addDays(isoToday(), 22));
@@ -137,7 +137,7 @@ test.describe('trips', () => {
     await goTo(page, 'Trips');
     await page.getByRole('button', { name: 'New trip' }).click();
     const s2 = page.getByRole('dialog', { name: 'New trip' });
-    await s2.getByLabel('Name', { exact: true }).fill('Copy of ' + name);
+    await s2.getByLabel('Name *', { exact: true }).fill('Copy of ' + name);
     await s2.getByLabel('Destination').fill('Elsewhere');
     await s2.getByLabel('Start date').fill(addDays(isoToday(), 60));
     await s2.getByLabel('End date').fill(addDays(isoToday(), 61));

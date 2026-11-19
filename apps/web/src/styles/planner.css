@@ -83,8 +83,6 @@
   .check { display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 0 14px; border-radius: var(--radius-ctl); border: 1px solid var(--glass-border); background: var(--glass-bg-2); font-weight: 500; }
   .check input { width: 22px; height: 22px; accent-color: var(--pine-600); }
   .sheet-inner { display: block; }
-  .sheet-foot { position: sticky; bottom: calc(-1 * (24px + env(safe-area-inset-bottom))); margin: 18px -20px calc(-24px - env(safe-area-inset-bottom)); display: flex; gap: 10px; align-items: center; padding: 12px 20px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--glass-border); background: color-mix(in oklab, var(--surface-2) 80%, transparent); -webkit-backdrop-filter: blur(var(--glass-blur)); backdrop-filter: blur(var(--glass-blur)); }
-  .sheet-foot .spacer { flex: 1; }
   .help-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
   .help-list li { display: flex; gap: 12px; }
   .help-list p { margin: 2px 0 0; }
@@ -494,7 +492,8 @@
 
   @media print {
     .no-print { display: none !important; }
-    .print-view { border: none; padding: 0; }
+    /* The margin lives inside the page (repeated on every page) so @page can be 0 below. */
+    .print-view { border: none; padding: 12mm 14mm; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 
@@ -519,7 +518,9 @@ body:has(.planner .print-view) .app-body { margin-left: 0; }
 body:has(.planner .print-view) .app-main { max-width: none; padding: 16px; }
 body:has(.planner .print-view) .app-shell::before { background: white; }
 @media print {
-  @page { margin: 14mm; }
+  /* No page margin leaves the browser no room to stamp its own header and footer (the page address, title and date). */
+  @page { margin: 0; }
+  body:has(.planner .print-view) .app-main { padding: 0; }
   html, body { background: white !important; }
   .app-shell { min-height: 0; }
 }

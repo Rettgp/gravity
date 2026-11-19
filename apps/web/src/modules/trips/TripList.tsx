@@ -1,14 +1,14 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronRight, MapPin, Plus } from 'lucide-react';
+import { Check, ChevronRight, MapPin, Plus } from 'lucide-react';
 import type { TripMeta } from '@gravity/shared';
 import { Sheet } from '../../components/Sheet';
 import { useFetcher } from '../../lib/api';
 import { localToday, addDays } from '../../lib/dates';
 import { useMe } from '../../lib/me';
 import { tripsKey, useTrips } from './api';
-import { groupTrips, rangeLabel, tripWhen } from './logic';
+import { daysBetween, groupTrips, rangeLabel, tripWhen } from './logic';
 
 function TripCard({ t, today }: { t: TripMeta; today: string }) {
   return (
@@ -80,6 +80,7 @@ function NewTripSheet({ trips, onClose }: { trips: TripMeta[]; onClose: () => vo
   const [copy, setCopy] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const [tried, setTried] = useState(false);
 
   const toggle = (n: string) => setPicked((on.has(n) ? new Set([...on].filter((x) => x !== n)) : new Set([...on, n])));
   const addExtra = () => {
@@ -89,15 +90,42 @@ function NewTripSheet({ trips, onClose }: { trips: TripMeta[]; onClose: () => vo
     setPicked(new Set([...on, n]));
     setExtra('');
   };
+  const nights = daysBetween(startDate, endDate);
+  // Checked on submit and shown inline: a greyed-out button never says what is missing.
+  const problems = {
+    name: !name.trim() ? 'Give the trip a name' : '',
+    destination: !destination.trim() ? 'Where are you going?' : '',
+    endDate: startDate && endDate && nights < 0 ? 'Ends before it starts' : '',
+  };
+  type Key = keyof typeof problems;
+  const show = (k: Key) => (tried ? problems[k] : '');
+  const aria = (k: Key) => ({ id: 'nt-' + k, 'aria-invalid': show(k) ? true : undefined, 'aria-describedby': show(k) ? 'nt-' + k + '-err' : undefined });
+  const field = (id: string, label: string, input: ReactNode, req = false) => {
+    const msg = id in problems ? show(id as Key) : '';
+    return (
+      <label className="field" htmlFor={'nt-' + id}>
+        <span>
+          {label}
+          {req && <span className="tr-req" aria-hidden="true"> *</span>}
+        </span>
+        {input}
+        {msg && <span className="tr-field-err" id={'nt-' + id + '-err'}>{msg}</span>}
+      </label>
+    );
+  };
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    setTried(true);
+    const bad = (Object.keys(problems) as Key[]).find((k) => problems[k]);
+    if (bad) return document.getElementById('nt-' + bad)?.focus();
     setBusy(true);
     setErr('');
     try {
       const t = await f<TripMeta>('/api/trips', {
         method: 'POST',
         body: {
-          name, destination, startDate, endDate,
+          name: name.trim(), destination: destination.trim(), startDate, endDate,
           ...(inTime ? { checkIn: startDate + 'T' + inTime } : {}),
           ...(outTime ? { checkOut: endDate + 'T' + outTime } : {}),
           tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -113,42 +141,70 @@ function NewTripSheet({ trips, onClose }: { trips: TripMeta[]; onClose: () => vo
       setBusy(false);
     }
   };
+
   return (
-    <Sheet title="New trip" onClose={onClose}>
-      <form className="tr-form" onSubmit={(e) => void submit(e)}>
-        <label className="field">Name<input className="input" required maxLength={120} value={name} onChange={(e) => setName(e.target.value)} /></label>
-        <label className="field">Destination<input className="input" required maxLength={160} value={destination} onChange={(e) => setDestination(e.target.value)} /></label>
-        <div className="tr-two">
-          <label className="field">Start date<input className="input" type="date" required value={startDate} onChange={(e) => setStart(e.target.value)} /></label>
-          <label className="field">End date<input className="input" type="date" required min={startDate} value={endDate} onChange={(e) => setEnd(e.target.value)} /></label>
-          <label className="field">Check-in time<input className="input" type="time" value={inTime} onChange={(e) => setIn(e.target.value)} /></label>
-          <label className="field">Check-out time<input className="input" type="time" value={outTime} onChange={(e) => setOut(e.target.value)} /></label>
-        </div>
-        <fieldset className="tr-fieldset">
-          <legend>Who is going</legend>
-          <div className="tr-chips">
+    <Sheet
+      title="New trip"
+      subtitle="Days, packing, groceries and costs, all in one place."
+      onClose={onClose}
+      footer={
+        <>
+          <button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <span className="spacer" />
+          <button className="btn" type="submit" form="new-trip" disabled={busy}>{busy ? 'Creating…' : 'Create trip'}</button>
+        </>
+      }
+    >
+      <form id="new-trip" className="tr-form tr-new" noValidate onSubmit={(e) => void submit(e)}>
+        <section className="tr-new-sec" aria-labelledby="nt-where">
+          <h3 id="nt-where">Where</h3>
+          {field('name', 'Name', <input className="input" {...aria('name')} aria-required="true" maxLength={120} placeholder="e.g. Lake weekend" autoComplete="off" value={name} onChange={(e) => setName(e.target.value)} />, true)}
+          {field('destination', 'Destination', <input className="input" {...aria('destination')} aria-required="true" maxLength={160} placeholder="e.g. Branson, MO" autoComplete="off" value={destination} onChange={(e) => setDestination(e.target.value)} />, true)}
+        </section>
+
+        <section className="tr-new-sec" aria-labelledby="nt-when">
+          <div className="tr-new-head">
+            <h3 id="nt-when">When</h3>
+            {nights >= 0 && <span className="chip tr-chip">{nights === 0 ? 'Day trip' : nights + (nights === 1 ? ' night' : ' nights')}</span>}
+          </div>
+          <div className="tr-two">
+            {field('startDate', 'Start date', <input className="input" id="nt-startDate" type="date" value={startDate} onChange={(e) => setStart(e.target.value)} />)}
+            {field('endDate', 'End date', <input className="input" {...aria('endDate')} type="date" min={startDate} value={endDate} onChange={(e) => setEnd(e.target.value)} />)}
+            {field('in', 'Check-in time', <input className="input" id="nt-in" type="time" value={inTime} onChange={(e) => setIn(e.target.value)} />)}
+            {field('out', 'Check-out time', <input className="input" id="nt-out" type="time" value={outTime} onChange={(e) => setOut(e.target.value)} />)}
+          </div>
+        </section>
+
+        <section className="tr-new-sec" aria-labelledby="nt-who">
+          <h3 id="nt-who">Who is going</h3>
+          <div className="jr-chips" role="group" aria-labelledby="nt-who">
             {names.map((n) => (
-              <label key={n} className={'chip tr-pick' + (on.has(n) ? ' on is-selected' : '')}>
-                <input type="checkbox" checked={on.has(n)} onChange={() => toggle(n)} /> {n}
-              </label>
+              <button key={n} type="button" className="chip tr-pick" aria-pressed={on.has(n)} onClick={() => toggle(n)}>
+                {on.has(n) && <Check size={15} aria-hidden="true" />}
+                {n}
+              </button>
             ))}
           </div>
           <div className="tr-add">
-            <input className="input" aria-label="Add another person" placeholder="Add another person" value={extra} maxLength={60} onChange={(e) => setExtra(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addExtra())} />
-            <button type="button" className="btn btn-ghost btn-sm" onClick={addExtra}>Add</button>
+            <input className="input" aria-label="Add another person" placeholder="Add a friend or relative" value={extra} maxLength={60} onChange={(e) => setExtra(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addExtra())} />
+            <button type="button" className="icon-btn tr-add-btn" aria-label="Add person" disabled={!extra.trim()} onClick={addExtra}>
+              <Plus size={20} aria-hidden="true" />
+            </button>
           </div>
-        </fieldset>
+        </section>
+
         {trips.length > 0 && (
-          <label className="field">
-            Copy packing and grocery lists from
-            <select className="input" value={copy} onChange={(e) => setCopy(e.target.value)}>
-              <option value="">Start with fresh lists</option>
-              {trips.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-          </label>
+          <section className="tr-new-sec" aria-labelledby="nt-lists">
+            <h3 id="nt-lists">Lists</h3>
+            {field('copy', 'Copy packing and grocery lists from', (
+              <select className="input" id="nt-copy" value={copy} onChange={(e) => setCopy(e.target.value)}>
+                <option value="">Start with fresh lists</option>
+                {trips.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            ))}
+          </section>
         )}
         {err && <p className="jr-error" role="alert">{err}</p>}
-        <button className="btn" type="submit" disabled={busy || !name.trim() || !destination.trim()}>{busy ? 'Creating...' : 'Create trip'}</button>
       </form>
     </Sheet>
   );

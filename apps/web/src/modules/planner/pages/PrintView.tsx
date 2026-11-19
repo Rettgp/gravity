@@ -8,6 +8,21 @@ import { budgetSummary, giftCost, giftStats, hasCost, overallProgress } from '..
 import { activeTags } from '../data/giftTags'
 import { withMealInfo } from '../data/meals'
 
+/** A gift's store link: clickable in the PDF, printed without the protocol and tracking query so it stays readable on paper. Only http(s) links become links. */
+function printLink(link: unknown): ReactNode {
+  const raw = String(link ?? '').trim()
+  if (!raw) return ''
+  let url: URL
+  try {
+    url = new URL(raw)
+  } catch {
+    return raw
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return raw
+  const shown = (url.host.replace(/^www\./, '') + url.pathname).replace(/\/$/, '')
+  return <a href={url.href}>{shown}</a>
+}
+
 function Section({ title, show = true, children }: { title: ReactNode; show?: boolean; children: ReactNode }) {
   if (!show) return null
   return (
@@ -81,6 +96,7 @@ function GiftExport({ gifts, buyer, title, currency }: { gifts: Item[]; buyer: s
             const rows: [string, ReactNode][] = [
               ['Cost', hasCost(g) ? m(giftCost(g)) : ''],
               ['Notes', g.notes],
+              ['Link', printLink(g.link)],
             ]
             return (
               <article key={g.id} className="pr-gift">
