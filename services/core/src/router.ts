@@ -1,8 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import {
+  FEEDBACK_ID_RE,
+  FEEDBACK_MAX_AREA,
+  FEEDBACK_MAX_DESCRIPTION,
+  FEEDBACK_PK,
+  FEEDBACK_TYPES,
   HttpError,
   canManage,
   createRouter,
+  feedbackSk,
   managerInput,
   normalizeEmail,
   parse,
@@ -21,13 +27,44 @@ export interface CoreDeps {
   db: Db;
   table: string;
   allowlist: () => Promise<string[]>;
+  now?: () => Date;
 }
+
+type Doc = Record<string, unknown>;
+const feedbackId = (v: string) => {
+  if (!FEEDBACK_ID_RE.test(v)) throw new HttpError(400, 'Invalid id');
+  return v;
+};
+
+const cleanFeedback = (body: unknown, user: string, nowMs: number, existing: Doc | null): Doc => {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new HttpError(400, 'Expected a JSON object');
+  const b = body as Doc;
+  const description = String(b.description || '').trim();
+  if (!description) throw new HttpError(400, 'Description is required');
+  if ([...description].length > FEEDBACK_MAX_DESCRIPTION) throw new HttpError(400, 'Description is too long (2000 characters max)');
+  if (typeof b.type !== 'string' || !(FEEDBACK_TYPES as readonly string[]).includes(b.type)) throw new HttpError(400, 'Type must be Feature or Bug');
+  const area = typeof b.area === 'string' ? b.area.trim() : '';
+  if (!area || [...area].length > FEEDBACK_MAX_AREA) throw new HttpError(400, 'Choose a section of the app');
+  const done = Boolean(b.done);
+  // Authorship and timestamps come from the server (or the stored item), never from the request. So do originalArea/occasion (migrated rows only).
+  return {
+    type: b.type,
+    area,
+    description,
+    done,
+    createdAt: existing?.createdAt || nowMs,
+    createdBy: existing?.createdBy || user,
+    doneAt: done ? existing?.doneAt || nowMs : null,
+    ...(existing?.originalArea ? { originalArea: existing.originalArea } : {}),
+    ...(existing?.occasion ? { occasion: existing.occasion } : {}),
+  };
+};
 
 const summary = (p: Profile): ProfileSummary => ({ id: p.id, name: p.name, color: p.color, ...(p.picture ? { picture: p.picture } : {}) });
 /** Only Google-hosted profile photos are ever stored or shown (nothing arbitrary, nothing over http). */
 const safePicture = (url: string | undefined) => (url && url.length <= 500 && /^https:\/\/[a-z0-9-]+\.googleusercontent\.com\/\S+$/i.test(url) ? url : undefined);
 
-export function buildCoreRouter({ db, table, allowlist }: CoreDeps) {
+export function buildCoreRouter({ db, table, allowlist, now = () => new Date() }: CoreDeps) {
   const loadProfile = async (id: string) => {
     const it = await db.get(table, `PROFILE#${id}`, 'META');
     if (!it) throw new HttpError(404, 'Profile not found');
@@ -156,6 +193,26 @@ export function buildCoreRouter({ db, table, allowlist }: CoreDeps) {
         await savePublic(next);
         await db.delete(table, `USER#${params.sub}`, `PROFILE#${p.id}`);
         return next;
+      },
+    },
+    { method: 'GET', path: '/feedback', handler: async () => ({ items: (await db.query(table, FEEDBACK_PK, 'F#')).map((r) => r.doc as Doc).sort((a, b) => Number(b.createdAt) - Number(a.createdAt)) }) },
+    {
+      method: 'PUT',
+      path: '/feedback/:id',
+      handler: async ({ user, params, body }) => {
+        const id = feedbackId(params.id!);
+        const old = await db.get(table, FEEDBACK_PK, feedbackSk(id));
+        const item = { ...cleanFeedback(body, user.name || user.email, now().getTime(), (old?.doc as Doc | undefined) ?? null), id };
+        await db.put(table, { pk: FEEDBACK_PK, sk: feedbackSk(id), doc: item, updatedBy: user.email, updatedAt: Math.floor(now().getTime() / 1000) });
+        return { item };
+      },
+    },
+    {
+      method: 'DELETE',
+      path: '/feedback/:id',
+      handler: async ({ params }) => {
+        await db.delete(table, FEEDBACK_PK, feedbackSk(feedbackId(params.id!)));
+        return { ok: true };
       },
     },
   ];

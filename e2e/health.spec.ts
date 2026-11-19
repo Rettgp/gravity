@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ART, signIn, watchErrors } from './helpers';
+import { ART, goTo, signIn, watchErrors } from './helpers';
 
 // Local mode swaps Google for a fake that bounces straight back to the app, so this exercises the real UI + API flow.
 test.describe('health', () => {
@@ -10,7 +10,7 @@ test.describe('health', () => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await signIn(page, who);
 
-    await page.getByRole('link', { name: 'Health' }).first().click();
+    await goTo(page, 'Health');
     await expect(page).toHaveURL(/\/app\/health$/);
     await expect(page.getByRole('heading', { name: /health data/ })).toBeVisible();
     await expect(page.getByText('has not verified this app')).toBeVisible();

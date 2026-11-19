@@ -25,7 +25,10 @@
     "deploy": "npm run build -w apps/web && npm run deploy -w infra",
     "synth": "npm run build -w apps/web && npm run synth -w infra",
     "verify": "npm run typecheck && vitest run && playwright test",
-    "tandoor:export": "tsx scripts/tandoor-export.ts"
+    "tandoor:export": "tsx scripts/tandoor-export.ts",
+    "migrate:planner": "tsx scripts/migrate-planner.ts",
+    "migrate:branson": "tsx scripts/export-branson.ts",
+    "migrate:trip-import": "tsx scripts/import-trip.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

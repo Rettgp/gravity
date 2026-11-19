@@ -25,6 +25,8 @@ export interface HealthMetrics {
   /** Local clock time (HH:MM) the main sleep started and ended. */
   bedtime?: string;
   wakeTime?: string;
+  /** Minutes whose average heart rate was above WORKOUT_BPM. */
+  workoutMinutes?: number;
 }
 export type HealthMetricKey = keyof HealthMetrics;
 export type HealthDay = HealthMetrics & { date: string };
@@ -130,7 +132,8 @@ interface SleepSession {
   periodMinutes: number;
 }
 
-const offsetMs = (s: unknown) => (num(String(s ?? '').replace(/s$/, '')) ?? 0) * 1000;
+/** A Google UTC offset ("-21600s") in ms; 0 when missing. */
+export const offsetMs = (s: unknown) => (num(String(s ?? '').replace(/s$/, '')) ?? 0) * 1000;
 const localIso = (utcMs: number, offset: number) => new Date(utcMs + offset).toISOString();
 
 function toSession(p: Record<string, any>): SleepSession | undefined {
@@ -198,6 +201,25 @@ export function parseSleep(json: unknown): DayMap {
   return out;
 }
 
+/** A workout minute is a minute whose average heart rate is above this. */
+export const WORKOUT_BPM = 110;
+
+/**
+ * Heart-rate rollup points (60s windows) -> workout minutes per local day. The rollup only carries UTC times, so
+ * `offset` (ms) places each minute on the person's own calendar day. Days with heart-rate data but no workout get 0.
+ */
+export function parseWorkoutMinutes(points: Record<string, any>[], offset: number): DayMap {
+  const out: DayMap = new Map();
+  for (const p of points) {
+    const avg = num(p.heartRate?.beatsPerMinuteAvg);
+    const start = Date.parse(p.startTime ?? '');
+    if (avg === undefined || Number.isNaN(start)) continue;
+    const date = localIso(start, offset).slice(0, 10);
+    out.set(date, { workoutMinutes: (out.get(date)?.workoutMinutes ?? 0) + (avg > WORKOUT_BPM ? 1 : 0) });
+  }
+  return out;
+}
+
 /** Merge `from` into `into`, newer values winning per field. */
 export function mergeDays(into: DayMap, from: DayMap): DayMap {
   for (const [date, m] of from) into.set(date, { ...into.get(date), ...m });
@@ -246,38 +268,69 @@ export function seriesFor(days: HealthDay[], key: HealthMetricKey, from: string,
   return out;
 }
 
-// ---- Family steps challenge ------------------------------------------------------------------------------------
-// Health data is private to its owner, with one deliberate exception: each person's monthly step total is shown to the
-// rest of the (allowlisted) family on the podium. Nothing else about a person's health leaves their profile.
+// ---- Family monthly challenge --------------------------------------------------------------------------------
+// Health data is private to its owner, with one deliberate exception: each person's monthly total for the month's
+// challenge metric is shown to the rest of the (allowlisted) family. Nothing else about a person's health leaves their profile.
 
-export interface StepsEntry {
+export type ChallengeMetric = 'steps' | 'workoutMinutes';
+export interface Challenge {
+  /** YYYY-MM */
+  month: string;
+  name: string;
+  metric: ChallengeMetric;
+  unit: string;
+  rule: string;
+}
+
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/** Named challenges, oldest first. Past challenges are listed from the first one on. */
+export const CHALLENGES: Challenge[] = [
+  { month: '2026-10', name: 'Walktober', metric: 'steps', unit: 'steps', rule: 'Most steps in October.' },
+  { month: '2026-11', name: 'Novemburn', metric: 'workoutMinutes', unit: 'workout minutes', rule: `Most minutes with heart rate above ${WORKOUT_BPM} bpm.` },
+];
+
+/** Any month without a named challenge is a plain steps challenge. */
+export const challengeFor = (month: string): Challenge =>
+  CHALLENGES.find((c) => c.month === month) ?? {
+    month,
+    name: `${MONTH_NAMES[Number(month.slice(5)) - 1]} steps challenge`,
+    metric: 'steps',
+    unit: 'steps',
+    rule: 'Most steps this month.',
+  };
+
+export interface LeaderboardEntry {
   profileId: string;
   name: string;
   color: string;
   picture?: string;
-  steps: number;
+  total: number;
   /** 1 for the winner. People with the same total share a rank. */
   rank: number;
 }
-export interface StepsLeaderboard {
-  /** YYYY-MM */
-  month: string;
-  entries: StepsEntry[];
+export interface Leaderboard extends Challenge {
+  entries: LeaderboardEntry[];
   /** Family members who have not connected Google Health yet, so they are not on the podium. */
   waiting: string[];
+  /** The month is over and late uploads are in: the result is stored and no longer changes. */
+  final: boolean;
 }
 
-/** Sum the steps for one month (YYYY-MM) from a person's stored days. */
-export function monthSteps(days: { date: string; steps?: number }[], month: string): number {
+/** Sum one metric for one month (YYYY-MM) from a person's stored days. */
+export function monthTotal(days: HealthDay[], month: string, metric: ChallengeMetric): number {
   let total = 0;
-  for (const d of days) if (d.date.startsWith(month + '-') && typeof d.steps === 'number') total += d.steps;
+  for (const d of days) if (d.date.startsWith(month + '-') && typeof d[metric] === 'number') total += d[metric];
   return Math.round(total);
 }
 
 /** Highest first; ties keep the same rank (1, 1, 3) and are ordered by name so the list never jumps around. */
-export function rankSteps(people: { profileId: string; name: string; color: string; picture?: string; steps: number }[]): StepsEntry[] {
-  const sorted = [...people].sort((a, b) => b.steps - a.steps || a.name.localeCompare(b.name));
-  const out: StepsEntry[] = [];
-  sorted.forEach((p, i) => out.push({ ...p, rank: i > 0 && out[i - 1]!.steps === p.steps ? out[i - 1]!.rank : i + 1 }));
+export function rankTotals(people: Omit<LeaderboardEntry, 'rank'>[]): LeaderboardEntry[] {
+  const sorted = [...people].sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+  const out: LeaderboardEntry[] = [];
+  sorted.forEach((p, i) => out.push({ ...p, rank: i > 0 && out[i - 1]!.total === p.total ? out[i - 1]!.rank : i + 1 }));
   return out;
 }
+
+/** Everyone sharing first place, or nobody if no one scored. */
+export const winnersOf = (b: Leaderboard) => b.entries.filter((e) => e.rank === 1 && e.total > 0);

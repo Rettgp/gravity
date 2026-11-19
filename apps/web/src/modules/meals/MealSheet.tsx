@@ -3,7 +3,7 @@ import { itemId, quantityOf, SLOT_LABEL, type PlanEntry } from '@gravity/shared'
 import { Icon } from '../../components/Icon';
 import { dayLabel } from '../../lib/dates';
 import { useGrocery } from './api';
-import { Sheet } from './Sheet';
+import { Sheet } from '../../components/Sheet';
 
 /** One planned meal: tap the ingredients you need and they go onto the grocery list. */
 export function MealSheet({ entry, onClose, onRemove }: { entry: PlanEntry; onClose: () => void; onRemove: () => void }) {

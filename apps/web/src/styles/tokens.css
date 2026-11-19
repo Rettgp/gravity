@@ -40,12 +40,31 @@
   --unwell: #d6403d;
   --unwell-bg: color-mix(in oklab, var(--coral) 18%, var(--surface));
   --well: #1f9a67;
-  --glass-border: rgba(14, 26, 36, 0.10);
+  --glass-border: rgba(255, 255, 255, 0.6);
   --glass-highlight: rgba(255, 255, 255, 0.9);
   --dot: rgba(14, 26, 36, 0.09);
   --hero-glow: color-mix(in oklab, var(--p-500) 22%, transparent);
   --hero-glow-2: color-mix(in oklab, var(--violet) 16%, transparent);
   --shadow-none: none;
+  /* The field is deliberately colourful: glass only reads as glass when there is something behind it to see.
+     Aurora: broad, softly blurred ribbons of cyan, azure, violet and rose sweep diagonally (public/bg-aurora-*.svg).
+     A faint grain on top stops banding on large screens. */
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.06'/%3E%3C/svg%3E");
+  --field: var(--grain), url('/bg-aurora-light.svg') center / cover no-repeat, #d2defa;
+  --glass-bg: color-mix(in oklab, white 36%, transparent);
+  --rail-bg: color-mix(in oklab, white 62%, transparent);
+  --rail-text: #3c4b5c;
+  --glass-bg-2: color-mix(in oklab, white 30%, transparent);
+  /* Selected/current item: a brighter, denser frosted pill that lifts off the glass. No coloured outline. */
+  --sel-bg: color-mix(in oklab, white 80%, transparent);
+  --sel-shadow: inset 0 1px 0 white, 0 6px 18px -8px color-mix(in oklab, var(--p-700) 45%, transparent);
+  --glass-shadow: 0 10px 30px -14px color-mix(in oklab, var(--p-500) 40%, transparent);
+
+  --glass-blur: 20px;
+  --radius-card: 20px;
+  --radius-ctl: 14px;
+  --rail-w: 264px;
+  --tab-h: 0px; /* no bottom tab bar any more; kept so fixed buttons and toasts sit just above the screen edge */
   color-scheme: light;
 }
 
@@ -65,11 +84,19 @@
   --unwell-bg: color-mix(in oklab, var(--coral) 24%, var(--surface));
   --well: #46d19a;
   --glimmer: #ffd25e;
-  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-border: rgba(255, 255, 255, 0.16);
   --glass-highlight: rgba(255, 255, 255, 0.15);
   --dot: rgba(255, 255, 255, 0.08);
   --hero-glow: color-mix(in oklab, var(--p-500) 32%, transparent);
   --hero-glow-2: color-mix(in oklab, var(--violet) 30%, transparent);
+  --field: var(--grain), url('/bg-aurora-dark.svg') center / cover no-repeat, #0d1233;
+  --glass-bg: color-mix(in oklab, white 9%, transparent);
+  --rail-bg: color-mix(in oklab, #0a1028 58%, transparent);
+  --rail-text: #bcc8da;
+  --glass-bg-2: color-mix(in oklab, white 7%, transparent);
+  --sel-bg: color-mix(in oklab, white 17%, transparent);
+  --sel-shadow: inset 0 1px 0 color-mix(in oklab, white 28%, transparent), 0 8px 22px -10px color-mix(in oklab, black 80%, transparent);
+  --glass-shadow: 0 10px 30px -14px color-mix(in oklab, black 70%, transparent);
   color-scheme: dark;
 }
 
@@ -90,11 +117,19 @@
     --unwell-bg: color-mix(in oklab, var(--coral) 24%, var(--surface));
     --well: #46d19a;
     --glimmer: #ffd25e;
-    --glass-border: rgba(255, 255, 255, 0.12);
+    --glass-border: rgba(255, 255, 255, 0.16);
     --glass-highlight: rgba(255, 255, 255, 0.15);
     --dot: rgba(255, 255, 255, 0.08);
     --hero-glow: color-mix(in oklab, var(--p-500) 32%, transparent);
     --hero-glow-2: color-mix(in oklab, var(--violet) 30%, transparent);
+    --field: var(--grain), url('/bg-aurora-dark.svg') center / cover no-repeat, #0d1233;
+    --glass-bg: color-mix(in oklab, white 9%, transparent);
+    --rail-bg: color-mix(in oklab, #0a1028 58%, transparent);
+    --rail-text: #bcc8da;
+    --glass-bg-2: color-mix(in oklab, white 7%, transparent);
+    --sel-bg: color-mix(in oklab, white 17%, transparent);
+    --sel-shadow: inset 0 1px 0 color-mix(in oklab, white 28%, transparent), 0 8px 22px -10px color-mix(in oklab, black 80%, transparent);
+    --glass-shadow: 0 10px 30px -14px color-mix(in oklab, black 70%, transparent);
     color-scheme: dark;
   }
 }

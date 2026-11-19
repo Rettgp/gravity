@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 120 312 320">
+  <defs>
+    <linearGradient id="box" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d13a48"/>
+      <stop offset="1" stop-color="#8f1d2c"/>
+    </linearGradient>
+    <linearGradient id="lid" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e2505c"/>
+      <stop offset="1" stop-color="#b0283a"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbe7ac"/>
+      <stop offset="0.5" stop-color="#d9b865"/>
+      <stop offset="1" stop-color="#a8822f"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(0 -14)">
+  <!-- shadow -->
+  <ellipse cx="256" cy="430" rx="150" ry="13" fill="#000" opacity="0.08"/>
+
+  <!-- box -->
+  <rect x="130" y="250" width="252" height="176" rx="14" fill="url(#box)"/>
+  <rect x="130" y="250" width="252" height="16" fill="#000" opacity="0.18"/>
+  <rect x="130" y="316" width="252" height="38" fill="url(#gold)"/>
+  <rect x="235" y="250" width="42" height="176" fill="url(#gold)"/>
+
+  <!-- lid -->
+  <rect x="112" y="198" width="288" height="60" rx="14" fill="url(#lid)"/>
+  <rect x="231" y="198" width="50" height="60" fill="url(#gold)"/>
+
+  <!-- bow -->
+  <path d="M256 200 C 222 146, 150 142, 164 186 C 172 212, 222 210, 256 200 Z" fill="url(#gold)" stroke="#a8822f" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M256 200 C 290 146, 362 142, 348 186 C 340 212, 290 210, 256 200 Z" fill="url(#gold)" stroke="#a8822f" stroke-width="5" stroke-linejoin="round"/>
+  <path d="M244 196 C 222 172, 190 166, 190 182 C 190 194, 220 198, 244 196 Z" fill="#a8822f" opacity="0.45"/>
+  <path d="M268 196 C 290 172, 322 166, 322 182 C 322 194, 292 198, 268 196 Z" fill="#a8822f" opacity="0.45"/>
+  <rect x="236" y="182" width="40" height="34" rx="12" fill="url(#gold)" stroke="#a8822f" stroke-width="5"/>
+  </g>
+</svg>

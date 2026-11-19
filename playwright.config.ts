@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
-const API_PORT = 8887;
-const WEB_PORT = 5274;
+const API_PORT = Number(process.env.PW_API_PORT ?? 8887);
+const WEB_PORT = Number(process.env.PW_WEB_PORT ?? 5274);
 const dbFile = '.gravity-local/e2e-' + Date.now() + '.json';
 
 export default defineConfig({

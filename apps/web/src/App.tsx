@@ -1,10 +1,11 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Outlet, Route, Routes } from 'react-router-dom';
-import { AppNav } from './components/AppNav';
+import { AppShell } from './components/shell/AppShell';
 import { ApiError } from './lib/api';
 import { useAuth } from './lib/auth';
 import { useMe } from './lib/me';
 import { Dashboard } from './pages/Dashboard';
+import { Feedback } from './pages/Feedback';
 import { HealthCallback } from './pages/HealthCallback';
 import { HealthPage } from './pages/HealthPage';
 import { JournalPage } from './pages/JournalPage';
@@ -12,6 +13,8 @@ import { MealsPage } from './pages/MealsPage';
 import { Login } from './pages/Login';
 import { Profiles } from './pages/Profiles';
 
+const Planner = lazy(() => import('./modules/planner'));
+const Trips = lazy(() => import('./modules/trips'));
 const Landing = lazy(() => import('./pages/Landing').then((m) => ({ default: m.Landing })));
 
 /** OIDC return URL. Waits for the code exchange, then hands off to the router (never leaves a blank page). */
@@ -53,12 +56,9 @@ function Protected() {
   if (status === 'anon') return <Navigate to="/" replace />;
   if (me.isError) return <AccessProblem error={me.error} onRetry={() => void me.refetch()} />;
   return (
-    <div className="app-shell">
-      <AppNav />
-      <main className="app-main">
-        <Outlet />
-      </main>
-    </div>
+    <AppShell>
+      <Outlet />
+    </AppShell>
   );
 }
 
@@ -75,8 +75,11 @@ export function App() {
           <Route path="journal" element={<JournalPage />} />
           <Route path="health" element={<HealthPage />} />
           <Route path="meals" element={<MealsPage />} />
+          <Route path="planner/*" element={<Planner />} />
+          <Route path="trips/*" element={<Trips />} />
           <Route path="health/callback" element={<HealthCallback />} />
           <Route path="profiles" element={<Profiles />} />
+          <Route path="feedback" element={<Feedback />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

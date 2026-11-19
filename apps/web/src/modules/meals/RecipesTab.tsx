@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Icon } from '../../components/Icon';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { useMealsApi, useRecipes } from './api';
-import { Sheet } from './Sheet';
+import { Sheet } from '../../components/Sheet';
 import type { RecipeSummary } from '@gravity/shared';
 
 /** The recipe library: imported from a Tandoor export file, plus anything added by hand. */

@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { Icon } from '../../components/Icon';
+import { Icon } from './Icon';
 
 /** Bottom sheet on phones, side panel on desktop (the same look as the journal's day sheet). */
 export function Sheet({ title, subtitle, onClose, children }: { title: string; subtitle?: string; onClose: () => void; children: ReactNode }) {

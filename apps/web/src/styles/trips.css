@@ -1,0 +1,128 @@
+/* Trips module. Glass only: every fill is a translucent tint (never --surface/--bg), borders are the white hairline,
+   and nothing repeated uses backdrop-filter. Sheets (.tr-form lives inside them) may be denser, set by glass.css. */
+.tr, .tr-form {
+  --tr-ink: color-mix(in oklab, var(--text) 8%, transparent);
+  --tr-line: color-mix(in oklab, var(--text) 24%, transparent);
+  --tr-muted: color-mix(in oklab, var(--muted) 45%, var(--text));
+}
+.tr .muted, .tr-form .muted { color: var(--tr-muted); }
+.tr { min-width: 0; }
+.tr h2 { font-size: 20px; }
+.tr h3 { font-size: 16px; }
+.tr a { color: color-mix(in oklab, var(--link) 70%, var(--text)); text-decoration: underline; text-underline-offset: 2px; }
+.tr a.btn, .tr .segmented a, .tr a.tr-back, .tr a.tr-trip, .tr a.tr-day { text-decoration: none; }
+.tr a.tr-trip, .tr a.tr-day { color: var(--text); }
+
+/* Inputs, chips and ghost buttons are translucent too. */
+.tr .input, .tr-form .input { background: var(--tr-ink); border: 1px solid var(--tr-line); color: var(--text); min-width: 0; }
+.tr .input::placeholder, .tr-form .input::placeholder { color: var(--tr-muted); }
+.tr .btn-ghost, .tr-form .btn-ghost { background: var(--glass-bg-2); border-color: var(--tr-line); color: var(--text); }
+.tr .btn-ghost[aria-pressed='true'] { background: var(--accent-fill); color: var(--on-accent); border-color: transparent; }
+.tr .chip, .tr-form .chip, .tr-chip { background: var(--glass-bg-2); border: 1px solid var(--glass-border); color: var(--text); min-height: 28px; font-size: 13px; }
+.tr .btn-danger, .tr .tr-icon.danger { color: var(--unwell); }
+.tr-icon { min-width: 44px; min-height: 44px; padding: 0; flex: none; }
+
+.tr-card { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.tr-card-head { align-items: flex-start; flex-wrap: wrap; }
+.tr-card-head:empty, .tr-card-head h2:empty { display: none; }
+.tr-back { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; width: fit-content; font-weight: 500; }
+.tr-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.tr-head h1 { font-size: clamp(26px, 6vw, 38px); overflow-wrap: anywhere; }
+.tr-eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+.tr-sub { display: flex; gap: 6px 16px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
+.tr-sub span { display: inline-flex; gap: 4px; align-items: center; }
+.tr-nav { display: flex; width: 100%; }
+.tr .tr-nav > a { color: var(--text); }
+
+.tr-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.tr-empty { justify-items: start; }
+.tr-trip { display: flex; align-items: center; gap: 12px; color: var(--text); min-height: 44px; }
+.tr-trip-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.tr-trip-main > span { display: inline-flex; align-items: center; gap: 4px; }
+
+.tr-top { display: grid; gap: 16px; }
+@media (min-width: 768px) { .tr-top { grid-template-columns: 220px minmax(0, 1fr); } }
+.tr-lead { font-size: 17px; }
+.tr-todo ul { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 4px; }
+.tr-glance { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.tr-day { display: grid; gap: 2px; align-content: start; color: var(--text); min-height: 44px; position: relative; padding-left: 20px; background: color-mix(in oklab, var(--day, var(--accent)) 14%, var(--glass-bg-2)); }
+.tr-day::before, .tr-event::before { content: ''; position: absolute; left: 7px; top: 12px; bottom: 12px; width: 4px; border-radius: 4px; background: var(--day, var(--accent)); }
+.tr-clamp { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; }
+.tr-party, .tr-two { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); }
+.tr-party { grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+
+.tr-dayview .tr-dayhead { background: color-mix(in oklab, var(--day) 14%, var(--glass-bg)); }
+.tr-anchor-note { display: flex; gap: 8px; align-items: flex-start; }
+.tr-timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.tr-event { display: grid; gap: 8px; position: relative; padding-left: 22px; background: color-mix(in oklab, var(--day) 12%, var(--glass-bg-2)); min-width: 0; overflow-wrap: anywhere; }
+.tr-event.anchor { background: color-mix(in oklab, var(--day) 22%, var(--glass-bg-2)); }
+.tr-event-top { display: flex; gap: 8px; flex-wrap: wrap; }
+.tr-badge { gap: 4px; }
+.tr-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+.tr-reminders { display: grid; gap: 6px; }
+.tr-reminder { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-left: 12px; border-left: 2px dashed var(--tr-line); }
+.tr-actions { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+.tr-event .tr-actions { justify-content: flex-start; }
+.tr-subgroup { display: grid; gap: 8px; }
+.tr-line { display: flex; gap: 8px; align-items: flex-start; }
+.tr-line > :first-child { flex: 1; }
+.tr-rows, .tr-rowedit { display: grid; gap: 8px; min-width: 0; }
+.tr-kv { margin: 0; display: grid; gap: 6px; }
+.tr-kv-row { display: grid; gap: 2px; padding: 8px 12px; border-radius: var(--radius-ctl); background: var(--glass-bg-2); border: 1px solid var(--glass-border); overflow-wrap: anywhere; }
+.tr-kv-row.tbd { background: color-mix(in oklab, var(--amber) 22%, var(--glass-bg-2)); }
+.tr-kv dt { font-weight: 600; font-size: 13px; color: var(--tr-muted); }
+.tr-kv dd { margin: 0; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+@media (min-width: 640px) { .tr-kv-row { grid-template-columns: 180px minmax(0, 1fr); gap: 12px; } }
+.tr-flag { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-size: 14px; }
+.tr-flag input { width: 22px; height: 22px; accent-color: var(--accent-fill); }
+.tr-edit-toggle { display: grid; gap: 6px; justify-items: end; }
+.tr-hint { font-size: 12px; max-width: 36ch; text-align: right; }
+.tr-add { display: flex; gap: 8px; align-items: center; }
+.tr-add .input { flex: 1; }
+
+/* Checklists */
+.tr-check { display: grid; gap: 10px; }
+.tr-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 4px; padding: 2px 4px 2px 2px; }
+.tr-box { display: grid; place-items: center; width: 44px; height: 44px; border: 0; background: transparent; padding: 0; }
+.tr-box::before { content: ''; grid-area: 1 / 1; width: 24px; height: 24px; border-radius: 8px; border: 2px solid var(--tr-line); background: var(--tr-ink); }
+.tr-box svg { grid-area: 1 / 1; color: var(--on-accent); z-index: 1; }
+.tr-box[aria-checked='true']::before { background: var(--accent-fill); border-color: var(--accent-fill); }
+.tr-inline.input { background: transparent; border-color: transparent; padding-inline: 8px; }
+.tr-inline.input:focus { background: var(--tr-ink); border-color: var(--tr-line); }
+.tr-item.done .tr-inline { text-decoration: line-through; opacity: 0.7; }
+.tr-group { display: grid; gap: 10px; }
+.tr-group + .tr-group { padding-top: 14px; border-top: 1px solid var(--glass-border); }
+.tr-group-head { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; }
+.tr-title.input { font-weight: 600; font-family: var(--font-display); }
+.tr-count { font-size: 13px; font-variant-numeric: tabular-nums; }
+
+/* Tickets, dining, cost */
+.tr-ticket { display: grid; gap: 8px; }
+.tr-ticket.booked .tr-ticket-name, .tr-ticket.booked p { text-decoration: line-through; opacity: 0.7; }
+.tr-urgency { text-transform: capitalize; }
+.tr-urgency.urgent { background: color-mix(in oklab, var(--coral) 30%, transparent); }
+.tr-urgency.moderate { background: color-mix(in oklab, var(--amber) 30%, transparent); }
+.tr-urgency.flexible { background: color-mix(in oklab, var(--green) 30%, transparent); }
+.tr-dish { display: grid; gap: 6px; overflow-wrap: anywhere; }
+.tr-cost { display: grid; grid-template-columns: minmax(0, 1fr) minmax(90px, 130px) auto; gap: 8px; align-items: center; }
+.tr-amount { text-align: right; font-variant-numeric: tabular-nums; }
+.tr-stat .stat-value { font-size: 32px; }
+
+/* Forms in sheets */
+.tr-form { display: grid; gap: 14px; }
+.tr-form label.field { color: var(--tr-muted); }
+.tr-fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 8px; min-width: 0; }
+.tr-fieldset legend { font-size: 13px; font-weight: 500; color: var(--tr-muted); margin-bottom: 6px; padding: 0; }
+.tr-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.tr-pick { min-height: 44px; cursor: pointer; }
+.tr-pick input { width: 18px; height: 18px; accent-color: var(--accent-fill); }
+
+/* Notice: small, never blocks. Sits above the phone tab bar. */
+.tr-toast {
+  position: fixed; z-index: 70; left: 50%; transform: translateX(-50%); max-width: calc(100vw - 32px);
+  bottom: calc(var(--tab-h) + 16px + env(safe-area-inset-bottom, 0px)); padding: 10px 16px; border-radius: 999px;
+  background: color-mix(in oklab, var(--surface) 78%, transparent); color: var(--text); border: 1px solid var(--glass-border);
+  -webkit-backdrop-filter: blur(var(--glass-blur)); backdrop-filter: blur(var(--glass-blur)); box-shadow: var(--glass-shadow); font-size: 14px;
+}
+.tr-toast.error { background: color-mix(in oklab, var(--coral) 30%, var(--surface)); }
+@media (min-width: 768px) { .tr-toast { bottom: 24px; } }

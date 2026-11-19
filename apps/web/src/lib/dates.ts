@@ -1,4 +1,4 @@
-export { addDays, daysInMonth } from '@gravity/shared';
+export { addDays, daysInMonth, shiftMonth } from '@gravity/shared';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -8,11 +8,6 @@ export const localToday = () => {
   return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
 };
 export const monthOf = (date: string) => date.slice(0, 7);
-export const shiftMonth = (month: string, delta: number) => {
-  const [y, m] = month.split('-').map(Number) as [number, number];
-  const d = new Date(Date.UTC(y, m - 1 + delta, 1));
-  return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1);
-};
 export const monthLabel = (month: string) =>
   new Date(month + '-01T12:00:00').toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 export const dayLabel = (date: string) =>

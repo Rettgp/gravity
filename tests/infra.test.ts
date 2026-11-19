@@ -13,9 +13,27 @@ beforeAll(() => {
     googleClientId: 'test-client-id',
     googleClientSecret: 'test-secret',
     googleHealthClientId: 'health-client-id.apps.googleusercontent.com',
+    priceAlertFrom: 'alerts@example.com',
+    alertEmail: 'owner@example.com',
   });
   t = Template.fromStack(stack);
 }, 60_000);
+
+describe('infra: cost guardrail and recoverable photos', () => {
+  it('has a $5 monthly budget scoped to the app=gravity tag, alerting by email', () => {
+    t.hasResourceProperties('AWS::Budgets::Budget', {
+      Budget: Match.objectLike({ BudgetLimit: { Amount: 5, Unit: 'USD' }, TimeUnit: 'MONTHLY', CostFilters: { TagKeyValue: ['user:app$gravity'] } }),
+      NotificationsWithSubscribers: Match.arrayWith([Match.objectLike({ Subscribers: [{ SubscriptionType: 'EMAIL', Address: 'owner@example.com' }] })]),
+    });
+  });
+
+  it('keeps 30 days of overwritten or deleted photo versions', () => {
+    t.hasResourceProperties('AWS::S3::Bucket', {
+      VersioningConfiguration: { Status: 'Enabled' },
+      LifecycleConfiguration: { Rules: Match.arrayWith([Match.objectLike({ NoncurrentVersionExpiration: { NoncurrentDays: 30 }, Status: 'Enabled' })]) },
+    });
+  });
+});
 
 describe('infra: nobody but the family', () => {
   it('has no self sign-up, and Google is the only identity provider', () => {
@@ -58,13 +76,13 @@ describe('infra: nobody but the family', () => {
     });
   });
 
-  it('pulls the Google profile picture into Cognito and lets the page show Google-hosted images only', () => {
+  it('pulls the Google profile picture into Cognito and lets the page show https images (gift photos, Google avatars)', () => {
     t.hasResourceProperties('AWS::Cognito::UserPoolIdentityProvider', {
       AttributeMapping: Match.objectLike({ picture: 'picture', email: 'email' }),
     });
     t.hasResourceProperties('AWS::CloudFront::ResponseHeadersPolicy', {
       ResponseHeadersPolicyConfig: {
-        SecurityHeadersConfig: { ContentSecurityPolicy: { ContentSecurityPolicy: Match.stringLikeRegexp(String.raw`img-src 'self' data: https://[*]\.googleusercontent\.com;`) } },
+        SecurityHeadersConfig: { ContentSecurityPolicy: { ContentSecurityPolicy: Match.stringLikeRegexp(String.raw`img-src 'self' data: https:;`) } },
       },
     });
   });
@@ -96,13 +114,13 @@ describe('infra: nobody but the family', () => {
 
   it('never deletes family data with the stack, and stays pay-per-request', () => {
     const tables = t.findResources('AWS::DynamoDB::Table');
-    expect(Object.keys(tables)).toHaveLength(4);
+    expect(Object.keys(tables)).toHaveLength(6);
     for (const r of Object.values(tables) as any[]) {
       expect(r.DeletionPolicy).toBe('Retain');
       expect(r.Properties.BillingMode).toBe('PAY_PER_REQUEST');
       expect(r.Properties.PointInTimeRecoverySpecification.PointInTimeRecoveryEnabled).toBe(true);
     }
-    expect(Object.values(tables).map((r: any) => r.Properties.TableName).sort()).toEqual(['gravity-core', 'gravity-health', 'gravity-journal', 'gravity-meals']);
+    expect(Object.values(tables).map((r: any) => r.Properties.TableName).sort()).toEqual(['gravity-core', 'gravity-health', 'gravity-journal', 'gravity-meals', 'gravity-planner', 'gravity-trips']);
   });
 
   it('runs cheap arm64 Node 22 Lambdas and nothing that bills by the hour', () => {
@@ -126,7 +144,27 @@ describe('infra: nobody but the family', () => {
 
   it('syncs health data on a schedule, without a VPC, NAT or Secrets Manager', () => {
     t.hasResourceProperties('AWS::Events::Rule', { ScheduleExpression: 'rate(4 hours)' });
-    t.resourceCountIs('AWS::Events::Rule', 1);
+    t.resourceCountIs('AWS::Events::Rule', 2); // health sync + planner price check
+  });
+
+  it('routes the planner and trips services behind the JWT authorizer', () => {
+    const routes = Object.values(t.findResources('AWS::ApiGatewayV2::Route')).map((r: any) => r.Properties);
+    for (const key of ['ANY /api/planner/{proxy+}', 'ANY /api/trips/{proxy+}']) {
+      const r = routes.find((x: any) => x.RouteKey === key);
+      expect(r, key).toBeDefined();
+      expect(r.AuthorizationType).toBe('JWT');
+    }
+  });
+
+  it('lets the planner send price alerts through SES, and checks prices daily', () => {
+    const policies = Object.values(t.findResources('AWS::IAM::Policy')) as any[];
+    const ses = policies.flatMap((p) => p.Properties.PolicyDocument.Statement).filter((st: any) => ([] as string[]).concat(st.Action).includes('ses:SendEmail'));
+    expect(ses).toHaveLength(1);
+    expect(JSON.stringify(ses[0].Resource)).toContain(':ses:');
+    expect(JSON.stringify(ses[0].Resource)).toContain('identity/alerts@example.com');
+    const env = Object.values(t.findResources('AWS::Lambda::Function')).map((f: any) => f.Properties.Environment?.Variables ?? {});
+    expect(env.filter((e: any) => e.PRICE_ALERT_FROM === 'alerts@example.com')).toHaveLength(1);
+    t.hasResourceProperties('AWS::Events::Rule', { ScheduleExpression: 'cron(0 14 * * ? *)' });
   });
 
   it('gives the health function only its own SSM prefix, and never stores the Google health secret in the template', () => {

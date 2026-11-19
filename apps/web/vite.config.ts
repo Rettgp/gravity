@@ -9,7 +9,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon-32.png', 'apple-touch-icon.png', 'logo-mark.webp', 'logo-mark.avif'],
+      includeAssets: ['favicon-32.png', 'apple-touch-icon.png', 'logo-mark.svg'],
       manifest: {
         name: 'Gravity',
         short_name: 'Gravity',

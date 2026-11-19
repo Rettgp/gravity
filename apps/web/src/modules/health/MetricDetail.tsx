@@ -167,7 +167,7 @@ export function MetricDetail({ def, pid, days, loadingYear, onClose }: Props) {
 
         <details className="hl-table hl-modal-table">
           <summary>Show every value as a table</summary>
-          <div className="hl-scroll hl-scroll-tall">
+          <div data-carousel className="hl-scroll hl-scroll-tall">
             <table>
               <thead>
                 <tr>

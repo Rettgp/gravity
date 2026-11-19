@@ -8,6 +8,9 @@ import { addDays, FilePhotos, generateDemoDays, MemoryDb, normalizeEmail } from 
 import { buildCoreRouter } from '../services/core/src/router';
 import { buildJournalRouter } from '../services/journal/src/router';
 import { buildMealsRouter } from '../services/meals/src/router';
+import { buildPlannerRouter } from '../services/planner/src/router';
+import { createHttpFetcher } from '../services/planner/src/prices';
+import { buildTripsRouter } from '../services/trips/src/router';
 import { FakeGoogle, fakeDay } from '../services/health/src/fake';
 import { buildHealthRouter } from '../services/health/src/router';
 import { MemoryTokens } from '../services/health/src/tokens';
@@ -24,6 +27,10 @@ const allowlist = async () => ALLOWED;
 const core = buildCoreRouter({ db, table: 'core', allowlist });
 const journal = buildJournalRouter({ db, table: 'journal', coreTable: 'core', healthTable: 'health', photos: new FilePhotos(dirname(FILE) + '/photos'), allowlist });
 const meals = buildMealsRouter({ db, table: 'meals', allowlist });
+// Local-only: *.test hosts return a canned product page (price from ?price=, default 20) so price checks work offline.
+const realFetch = createHttpFetcher();
+const planner = buildPlannerRouter({ db, table: 'planner', allowlist, fetchPage: async (u) => (new URL(u).hostname.endsWith('.test') ? { finalUrl: u, html: '<script type="application/ld+json">{"@type":"Product","offers":{"price":' + Number(new URL(u).searchParams.get('price') ?? 20) + '}}</script><meta property="og:image" content="https://example.test/pic.png">' } : realFetch(u)) });
+const trips = buildTripsRouter({ db, table: 'trips', allowlist });
 // No Google in local mode: the fake bounces straight back as if consent was granted, and invents believable numbers.
 const health = buildHealthRouter({
   db,
@@ -99,6 +106,8 @@ createServer(async (req, res) => {
     return send(res, 200, { ok: true });
   }
 
-  const out = url.pathname.startsWith('/api/core') ? await core(r) : url.pathname.startsWith('/api/journal') ? await journal(r) : url.pathname.startsWith('/api/health') ? await health(r) : url.pathname.startsWith('/api/meals') ? await meals(r) : { status: 404, body: { error: 'Not found' } };
+  const routers = [['/api/core', core], ['/api/journal', journal], ['/api/health', health], ['/api/meals', meals], ['/api/planner', planner], ['/api/trips', trips]] as const;
+  const match = routers.find(([prefix]) => url.pathname.startsWith(prefix));
+  const out = match ? await match[1](r) : { status: 404, body: { error: 'Not found' } };
   send(res, out.status, out.body);
 }).listen(PORT, '127.0.0.1', () => console.log('[gravity] local API on http://127.0.0.1:' + PORT + ' (allowed: ' + ALLOWED.join(', ') + ')'));

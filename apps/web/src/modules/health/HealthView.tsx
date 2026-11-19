@@ -90,7 +90,7 @@ function DataTable({ days, today, metrics }: { days: HealthDay[]; today: string;
   return (
     <details className="card hl-table">
       <summary>Show the last two weeks as a table</summary>
-      <div className="hl-scroll">
+      <div data-carousel className="hl-scroll">
         <table>
           <thead>
             <tr>

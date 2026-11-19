@@ -85,7 +85,7 @@ export function Landing() {
           <motion.p {...rise(0.22)}>A home base for meals, health and the little things that make a household run. Built for phones, locked to your family.</motion.p>
           <motion.div className="hero-cta" {...rise(0.34)}>
             <button className="btn btn-light btn-lg" onClick={onSignIn}>
-              <GoogleG /> Sign in with Google
+              {config?.mode === 'local' ? 'Sign in with test data' : <><GoogleG /> Sign in with Google</>}
             </button>
             <p className="hero-note"><Icon name="lock" size={14} /> Invite-only. Just your family&apos;s accounts.</p>
           </motion.div>

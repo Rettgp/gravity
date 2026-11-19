@@ -50,9 +50,13 @@ The landing page is public but contains no data. Journal entries are private to 
 
 Estimated cost for a family of a few people: about $0.10-$0.25 per month.
 
+**Cost alert (optional).** Set `ALERT_EMAIL` (and `MONTHLY_BUDGET_USD`, default 5) in `.env.local` before deploying to get an AWS Budgets email at 50% and 100% of the monthly budget. Every Gravity resource is tagged `app=gravity` and the budget counts only that tag, so other projects in the account don't trip it. One-time step after the first deploy: AWS Billing console > Cost allocation tags > activate `app` (it can take up to 24 hours to appear; until then the budget reads $0).
+
 ## Health data (Fitbit + iPhone, optional)
 
-Each person can connect their Google Health account (the Fitbit successor; the old Fitbit Web API shuts down on 2026-10-30) on the **Health** page. Gravity pulls sleep, resting heart rate, HRV, SpO2, skin temperature, breathing rate and steps every 4 hours and keeps them per profile. Anything an iPhone shares with the Google Health app (Connections, Apps and services, Apple Health) comes through too, and steps are de-duplicated between watch and phone. Skin temperature, HRV and sleep only exist for nights the watch is worn to bed.
+Each person can connect their Google Health account (the Fitbit successor; the old Fitbit Web API shuts down on 2026-10-30) on the **Health** page. Gravity pulls sleep, resting heart rate, HRV, SpO2, skin temperature, breathing rate and steps every 4 hours and keeps them per profile. Anything an iPhone shares with the Google Health app (Connections, Apps and services, Apple Health) comes through too, and steps are de-duplicated between watch and phone. Skin temperature, HRV and sleep only exist for nights the watch is worn to bed. Workout minutes (minutes whose average heart rate is above 110 bpm) come from a per-minute heart-rate rollup, for the last 5 weeks only.
+
+Each month the family competes on the podium (Dashboard and Health). Named challenges live in `CHALLENGES` in `packages/shared/src/health.ts` (Walktober: steps, Novemburn: workout minutes); any other month is a steps challenge. Three days after a month ends, its result is stored in the health table (`CHALLENGES` / month) so past winners survive people disconnecting, and they are listed under "Past challenges".
 
 One-time setup, after the normal deploy above:
 
@@ -81,3 +85,17 @@ TANDOOR_URL=https://your-nas.your-tailnet.ts.net TANDOOR_TOKEN=tda_xxx npm run t
 ```
 
 On Windows PowerShell set the two variables first with `$env:TANDOOR_URL = '...'; $env:TANDOOR_TOKEN = '...'`. Then open Meals > Recipes > Import from Tandoor and pick `tandoor-recipes.json`. Re-import whenever your recipes change: it updates existing recipes and drops ones you deleted in Tandoor, and leaves recipes added by hand alone. Planned meals keep a copy of their ingredients, so they never break.
+
+## Migration (Christmas planner and the Branson trip)
+
+One-off, copy-only scripts that bring the old Christmas planner table and the saved Branson page into Gravity. Exports and snapshots live in `migration/` (gitignored: it holds real family data). Nothing in the old systems is changed.
+
+```bash
+npm run migrate:planner -- export                                     # read-only scan of the old table
+npm run migrate:planner -- import --target local --db <file>          # transform + write into a local MemoryDb file
+npm run migrate:planner -- verify --target local --db <file>          # deep-compare every row; exit 1 on any difference
+npm run migrate:branson                                               # saved page -> migration/branson/trip.json, with a completeness check
+npm run migrate:trip-import -- --target local --db <file>             # import through the real trips import route
+```
+
+`--target aws` exists on `import`, `verify` and `migrate:trip-import`; it needs `--yes` to write and refuses to overwrite existing rows without `--force`. Try everything against a local file first (`GRAVITY_LOCAL_DB=<file> npx tsx scripts/local-server.ts`). Scripts: `scripts/migrate-planner.ts`, `scripts/export-branson.ts`, `scripts/import-trip.ts`.

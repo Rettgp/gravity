@@ -76,9 +76,9 @@ export function Profiles() {
 
       <section className="card stack" aria-label="Appearance">
         <h2>Appearance</h2>
-        <div className="jr-tabs" role="radiogroup" aria-label="Theme">
+        <div className="segmented" role="radiogroup" aria-label="Theme">
           {(['system', 'light', 'dark'] as ThemeMode[]).map((m) => (
-            <button key={m} role="radio" aria-checked={mode === m} className={'jr-tab' + (mode === m ? ' on' : '')} onClick={() => setMode(m)}>
+            <button key={m} role="radio" aria-checked={mode === m} className={mode === m ? 'on' : undefined} onClick={() => setMode(m)}>
               {m === 'system' ? 'System' : m === 'light' ? 'Light' : 'Dark'}
             </button>
           ))}

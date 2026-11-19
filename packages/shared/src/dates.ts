@@ -13,6 +13,12 @@ export function addDays(date: string, n: number): string {
   return fmt(toUtc(date) + n * DAY_MS);
 }
 
+/** '2026-01', -1 -> '2025-12' */
+export function shiftMonth(month: string, delta: number): string {
+  const [y, m] = month.split('-').map(Number) as [number, number];
+  return fmt(Date.UTC(y, m - 1 + delta, 1)).slice(0, 7);
+}
+
 export function daysInMonth(month: string): string[] {
   const [y, m] = month.split('-').map(Number) as [number, number];
   const n = new Date(Date.UTC(y, m, 0)).getUTCDate();

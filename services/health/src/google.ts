@@ -1,6 +1,7 @@
 import {
   addDays,
   mergeDays,
+  offsetMs,
   parseBreathing,
   parseHrv,
   parseRestingHr,
@@ -8,6 +9,7 @@ import {
   parseSleep,
   parseSpo2,
   parseStepsRollup,
+  parseWorkoutMinutes,
   sleepDate,
   withinRange,
   type DayMap,
@@ -43,6 +45,10 @@ const SCOPES = ['activity_and_fitness', 'health_metrics_and_measurements', 'slee
 /** Rollups accept at most 90 days per request. */
 const ROLLUP_DAYS = 80;
 const MAX_PAGES = 40;
+/** Google caps heart-rate rollups at 14 days per request. */
+const HR_RANGE_DAYS = 14;
+/** Workout minutes are only fetched this far back: enough for the current month's challenge. */
+const WORKOUT_DAYS = 35;
 
 export interface RealGoogleOptions {
   clientId?: string;
@@ -146,6 +152,37 @@ export class RealGoogle implements GoogleHealth {
     return out;
   }
 
+  /** Workout minutes for [from, to): heart rate rolled up per minute, each minute placed on the person's local day. */
+  private async workoutMinutes(access: string, from: string, to: string): Promise<DayMap> {
+    // shortcut: older history is skipped (a year of minutes is ~500k windows); widen WORKOUT_DAYS if a chart ever needs it.
+    const floor = addDays(new Date().toISOString().slice(0, 10), -WORKOUT_DAYS);
+    if (from < floor) from = floor;
+    if (from >= to) return new Map();
+    // Rollups only speak UTC, so borrow the UTC offset from the newest heart-rate sample.
+    const latest = (await this.call(access, BASE + '/heart-rate/dataPoints?pageSize=1')) as { dataPoints?: Record<string, any>[] };
+    const offset = offsetMs(latest.dataPoints?.[0]?.heartRate?.sampleTime?.utcOffset);
+    const utc = (d: string) => new Date(Date.parse(d + 'T00:00:00Z') - offset).toISOString();
+    const ranges: [string, string][] = [];
+    for (let s = from; s < to; s = addDays(s, HR_RANGE_DAYS)) ranges.push([s, addDays(s, HR_RANGE_DAYS) < to ? addDays(s, HR_RANGE_DAYS) : to]);
+    const points = await Promise.all(
+      ranges.map(async ([s, e]) => {
+        const out: Record<string, any>[] = [];
+        let token: string | undefined;
+        for (let page = 0; page < MAX_PAGES; page++) {
+          const json = (await this.call(access, BASE + '/heart-rate/dataPoints:rollUp', {
+            method: 'POST',
+            body: { range: { startTime: utc(s), endTime: utc(e) }, windowSize: '60s', pageSize: 10000, ...(token ? { pageToken: token } : {}) },
+          })) as { rollupDataPoints?: Record<string, any>[]; nextPageToken?: string };
+          out.push(...(json.rollupDataPoints ?? []));
+          token = json.nextPageToken;
+          if (!token) break;
+        }
+        return out;
+      }),
+    );
+    return parseWorkoutMinutes(points.flat(), offset);
+  }
+
   /**
    * List a data type and parse it. Filtering is done here (not with Google's filter syntax) so a change in that syntax
    * cannot break the sync. Listings come newest first, so paging stops once a whole page is older than the window.
@@ -191,6 +228,7 @@ export class RealGoogle implements GoogleHealth {
       task('resting heart rate', () => this.list(access, 'daily-resting-heart-rate', 1000, from, parseRestingHr, daily('dailyRestingHeartRate'))),
       task('blood oxygen', () => this.list(access, 'daily-oxygen-saturation', 1000, from, parseSpo2, daily('dailyOxygenSaturation'))),
       task('skin temperature', () => this.list(access, 'daily-sleep-temperature-derivations', 1000, from, parseSkinTemp, daily('dailySleepTemperatureDerivations'))),
+      task('workout minutes', () => this.workoutMinutes(access, from, to)),
       task('breathing rate', () => this.list(access, 'daily-respiratory-rate', 1000, from, parseBreathing, daily('dailyRespiratoryRate'))),
     ]);
     const days: DayMap = new Map();

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 export type Theme = 'light' | 'dark';
 export type ThemeMode = Theme | 'system';
 const KEY = 'gravity.theme';
+const SYNC = 'gravity:theme';
 const QUERY = '(prefers-color-scheme: dark)';
 
 const systemTheme = (): Theme => (window.matchMedia(QUERY).matches ? 'dark' : 'light');
@@ -26,6 +27,7 @@ function apply(mode: ThemeMode) {
   } catch {
     /* storage may be unavailable (private mode) */
   }
+  window.dispatchEvent(new Event(SYNC)); // every useTheme() instance (top bar, sheet, Family page) follows
 }
 
 export function useTheme() {
@@ -37,7 +39,12 @@ export function useTheme() {
     const mq = window.matchMedia(QUERY);
     const on = () => setSystem(mq.matches ? 'dark' : 'light');
     mq.addEventListener('change', on);
-    return () => mq.removeEventListener('change', on);
+    const sync = () => setModeState(storedMode());
+    window.addEventListener(SYNC, sync);
+    return () => {
+      mq.removeEventListener('change', on);
+      window.removeEventListener(SYNC, sync);
+    };
   }, []);
 
   const setMode = useCallback((m: ThemeMode) => {

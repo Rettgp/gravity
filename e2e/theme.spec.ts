@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ART, signIn } from './helpers';
+import { ART, expectNoOverflow, goTo, signIn } from './helpers';
 
 test('theme toggle switches light/dark, persists, and both look right', async ({ page }, info) => {
   await page.emulateMedia({ colorScheme: 'light' });
@@ -26,15 +26,14 @@ test('no horizontal overflow across app pages', async ({ page }, info) => {
   for (const path of ['/app', '/app/journal', '/app/profiles']) {
     await page.goto(path);
     await page.waitForTimeout(400);
-    const over = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
-    expect(over, path).toBeLessThanOrEqual(1);
+    await expectNoOverflow(page);
   }
 });
 
 test('appearance: System follows the device live, explicit choices override it, sign-out works on phones', async ({ page }, info) => {
   await page.emulateMedia({ colorScheme: 'light' });
   await signIn(page, info.project.name === 'mobile' ? 'teen' : 'dad');
-  await page.getByRole('link', { name: 'Family', exact: true }).first().click();
+  await goTo(page, 'Family');
   const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   const theme = page.getByRole('radiogroup', { name: 'Theme' });
 

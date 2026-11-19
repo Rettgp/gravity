@@ -126,11 +126,11 @@ export function Glimmers({ pid, date, readOnly, ownerName, autoFocus }: Props) {
           <div className="gl-row">
             {photo || processing ? (
               <>
-                <label className="btn btn-ghost gl-icon gl-photo" title="Change photo" aria-label="Change photo">
+                <label className="icon-btn gl-icon gl-photo" title="Change photo" aria-label="Change photo">
                   <Icon name="image" size={22} />
                   <input key={pickKey} type="file" accept="image/*" className="sr-only" aria-label="Glimmer photo" onChange={(e) => void pick(e.target.files?.[0])} />
                 </label>
-                <button type="button" className="btn btn-ghost gl-icon gl-remove" title="Remove photo" aria-label="Remove photo" onClick={clearPhoto}>
+                <button type="button" className="icon-btn danger gl-icon gl-remove" title="Remove photo" aria-label="Remove photo" onClick={clearPhoto}>
                   <Icon name="trash" size={22} />
                 </button>
               </>

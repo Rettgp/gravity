@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   civilDate,
-  monthSteps,
-  rankSteps,
-  type StepsLeaderboard,
+  monthTotal,
+  offsetMs,
+  parseWorkoutMinutes,
+  rankTotals,
+  winnersOf,
+  type Leaderboard,
   compareToUsual,
   num,
   parseHrv,
@@ -74,6 +77,21 @@ describe('health parsing (recorded Google responses)', () => {
     });
     expect(days.get('2026-09-29')).toEqual({ steps: 3527 });
     expect(days.get('2026-09-28')).toEqual({ steps: 6323 });
+  });
+
+  it('workout minutes: 60s heart-rate windows averaging above 110, placed on the local day', () => {
+    const offset = offsetMs('-21600s');
+    const days = parseWorkoutMinutes(
+      [
+        { startTime: '2026-11-02T03:00:00Z', heartRate: { beatsPerMinuteAvg: 120 } }, // 9pm on Nov 1 locally
+        { startTime: '2026-11-02T03:01:00Z', heartRate: { beatsPerMinuteAvg: 110 } }, // not above 110
+        { startTime: '2026-11-02T07:00:00Z', heartRate: { beatsPerMinuteAvg: 130.5 } },
+        { startTime: '2026-11-02T08:00:00Z' }, // watch off: no value
+        { startTime: '2026-11-03T08:00:00Z', heartRate: { beatsPerMinuteAvg: 70 } },
+      ],
+      offset,
+    );
+    expect(Object.fromEntries(days)).toEqual({ '2026-11-01': { workoutMinutes: 1 }, '2026-11-02': { workoutMinutes: 1 }, '2026-11-03': { workoutMinutes: 0 } });
   });
 
   it('resting heart rate, HRV, SpO2 and skin temperature (with NaN baseline)', () => {
@@ -382,29 +400,64 @@ describe('health: Google client configuration', () => {
   });
 });
 
-describe('health: family steps challenge', () => {
-  const board = (who: Who | null, month?: string) => app.health(who, 'GET', '/steps/leaderboard', undefined, month ? { month } : {});
-  const total = (d: HealthDay[], month: string) => d.filter((x) => x.date.startsWith(month)).reduce((s, x) => s + (x.steps ?? 0), 0);
+describe('health: family challenge', () => {
+  const board = (who: Who | null, month?: string) => app.health(who, 'GET', '/leaderboard', undefined, month ? { month } : {});
+  const total = (d: HealthDay[], month: string, key: 'steps' | 'workoutMinutes' = 'steps') => d.filter((x) => x.date.startsWith(month)).reduce((s, x) => s + (x[key] ?? 0), 0);
 
-  it('ranks connected family members by this month\'s steps and lists who has not joined', async () => {
+  it("ranks connected family members by this month's steps and lists who has not joined", async () => {
     await connect('mom', momPid);
     await connect('dad', dadPid);
     await syncUntilDone('mom', momPid);
     await syncUntilDone('dad', dadPid);
     const res = await board('mom');
     expect(res.status).toBe(200);
-    const b = res.body as StepsLeaderboard;
+    const b = res.body as Leaderboard;
     expect(b.month).toBe('2026-09');
+    expect(b.name).toBe('September steps challenge');
     expect(b.entries).toHaveLength(2);
     const mom = total((await days('mom', momPid, { from: '2026-09-01', to: '2026-09-30' })).body as HealthDay[], '2026-09');
     const dad = total((await days('dad', dadPid, { from: '2026-09-01', to: '2026-09-30' })).body as HealthDay[], '2026-09');
-    expect(b.entries.find((e) => e.profileId === momPid)!.steps).toBe(mom);
-    expect(b.entries.find((e) => e.profileId === dadPid)!.steps).toBe(dad);
-    expect(b.entries[0]!.steps).toBeGreaterThanOrEqual(b.entries[1]!.steps);
+    expect(b.entries.find((e) => e.profileId === momPid)!.total).toBe(mom);
+    expect(b.entries.find((e) => e.profileId === dadPid)!.total).toBe(dad);
+    expect(b.entries[0]!.total).toBeGreaterThanOrEqual(b.entries[1]!.total);
     expect(b.entries[0]!.rank).toBe(1);
     expect(b.waiting).toEqual(['teen']);
-    // Only steps are shared: no other health numbers appear in the response.
-    expect(Object.keys(b.entries[0]!).sort()).toEqual(['color', 'name', 'profileId', 'rank', 'steps']);
+    // Only the monthly total is shared: no other health numbers appear in the response.
+    expect(Object.keys(b.entries[0]!).sort()).toEqual(['color', 'name', 'profileId', 'rank', 'total']);
+  });
+
+  it('Novemburn ranks workout minutes', async () => {
+    app.setNow('2026-11-05T12:00:00Z');
+    await connect('mom', momPid);
+    await syncUntilDone('mom', momPid);
+    const b = (await board('mom')).body as Leaderboard;
+    expect([b.month, b.name, b.metric, b.final]).toEqual(['2026-11', 'Novemburn', 'workoutMinutes', false]);
+    const mine = total((await days('mom', momPid, { from: '2026-11-01', to: '2026-11-30' })).body as HealthDay[], '2026-11', 'workoutMinutes');
+    expect(mine).toBeGreaterThan(0);
+    expect(b.entries[0]!.total).toBe(mine);
+  });
+
+  it('remembers a finished challenge once late syncs are in, even after someone disconnects', async () => {
+    app.setNow('2026-11-02T12:00:00Z');
+    await connect('mom', momPid);
+    await connect('dad', dadPid);
+    await syncUntilDone('mom', momPid);
+    await syncUntilDone('dad', dadPid);
+    const early = (await board('mom', '2026-10')).body as Leaderboard;
+    expect([early.name, early.metric, early.final]).toEqual(['Walktober', 'steps', false]);
+
+    app.setNow('2026-11-04T12:00:00Z');
+    const done = (await board('mom', '2026-10')).body as Leaderboard;
+    expect(done.final).toBe(true);
+    expect(done.entries).toEqual(early.entries);
+    expect(winnersOf(done)).toHaveLength(2); // the fake gives everyone the same days: a shared win
+
+    expect((await app.health('dad', 'DELETE', `/profiles/${dadPid}/link`)).status).toBe(204);
+    expect((await board('mom', '2026-10')).body).toEqual(done);
+    const past = (await app.health('dad', 'GET', '/challenges', undefined, { before: '2026-11' })).body as Leaderboard[];
+    expect(past).toEqual([done]);
+    // Before the first named challenge there is no history.
+    expect((await app.health('dad', 'GET', '/challenges', undefined, { before: '2026-10' })).body).toEqual([]);
   });
 
   it('is only for signed-in, allowlisted people, and rejects a bad month', async () => {
@@ -413,15 +466,19 @@ describe('health: family steps challenge', () => {
     expect((await board(null)).status).toBe(401);
     expect((await board('stranger')).status).toBe(403);
     expect((await board('mom', 'not-a-month')).status).toBe(400);
+    expect((await app.health('stranger', 'GET', '/challenges')).status).toBe(403);
+    expect((await app.health('mom', 'GET', '/challenges', undefined, { before: '2026-13' })).status).toBe(400);
   });
 
-  it('shares a rank on a tie', () => {
-    const r = rankSteps([
-      { profileId: 'a', name: 'A', color: '#2c95c8', steps: 10 },
-      { profileId: 'b', name: 'B', color: '#2c95c8', steps: 10 },
-      { profileId: 'c', name: 'C', color: '#2c95c8', steps: 5 },
+  it('shares a rank on a tie, and nobody wins with zero', () => {
+    const r = rankTotals([
+      { profileId: 'a', name: 'A', color: '#2c95c8', total: 10 },
+      { profileId: 'b', name: 'B', color: '#2c95c8', total: 10 },
+      { profileId: 'c', name: 'C', color: '#2c95c8', total: 5 },
     ]);
     expect(r.map((e) => e.rank)).toEqual([1, 1, 3]);
-    expect(monthSteps([{ date: '2026-09-01', steps: 3 }, { date: '2026-08-31', steps: 9 }, { date: '2026-09-02' }], '2026-09')).toBe(3);
+    expect(monthTotal([{ date: '2026-09-01', steps: 3 }, { date: '2026-08-31', steps: 9 }, { date: '2026-09-02' }], '2026-09', 'steps')).toBe(3);
+    const zero = rankTotals([{ profileId: 'a', name: 'A', color: '#2c95c8', total: 0 }]);
+    expect(winnersOf({ entries: zero } as Leaderboard)).toEqual([]);
   });
 });

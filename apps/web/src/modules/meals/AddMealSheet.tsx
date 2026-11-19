@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { MEAL_SLOTS, SLOT_LABEL, slotsFromKeywords, type MealSlot, type PlanInput } from '@gravity/shared';
 import { dayLabel } from '../../lib/dates';
 import { useRecipes } from './api';
-import { Sheet } from './Sheet';
+import { Sheet } from '../../components/Sheet';
 
 interface Props {
   date: string;

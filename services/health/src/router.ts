@@ -4,27 +4,31 @@ import {
   HttpError,
   addDays,
   canManage,
+  challengeFor,
+  CHALLENGES,
   createRouter,
   dateStr,
   parse,
   isAllowed,
-  monthSteps,
+  monthTotal,
   normalizeEmail,
-  rankSteps,
+  rankTotals,
+  shiftMonth,
   type Db,
   type HealthDay,
-  type StepsLeaderboard,
+  type Leaderboard,
   type Profile,
   type Route,
 } from '@gravity/shared/server';
 import type { GoogleHealth } from './google.js';
-import { HISTORY_DAYS, dayKey, indexKey, linkKey, syncAll, syncProfile, toLink, type LinkItem } from './sync.js';
+import { HISTORY_DAYS, RECENT_DAYS, dayKey, indexKey, linkKey, syncAll, syncProfile, toLink, type LinkItem } from './sync.js';
 import type { TokenStore } from './tokens.js';
 
 export const HEALTH_PREFIX = '/api/health';
 /** A started connection must be finished within this long. */
 const STATE_TTL_MS = 15 * 60_000;
 const MAX_DAYS = 400;
+const monthParam = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/);
 
 export interface HealthDeps {
   db: Db;
@@ -63,6 +67,36 @@ export function buildHealthRouter(deps: HealthDeps) {
   const loadLink = async (pid: string) => {
     const k = linkKey(pid);
     return (await db.get(table, k.pk, k.sk)) as LinkItem | undefined;
+  };
+
+  const board = async (month: string): Promise<Leaderboard> => {
+    const key = { pk: 'CHALLENGES', sk: month };
+    const saved = await db.get(table, key.pk, key.sk);
+    if (saved) {
+      const { pk: _pk, sk: _sk, ...b } = saved;
+      return b as unknown as Leaderboard;
+    }
+    const challenge = challengeFor(month);
+    const list = await allowlist();
+    const people = [];
+    const connected = new Set<string>();
+    for (const idx of await db.query(table, 'LINKS')) {
+      const pid = String(idx.profileId);
+      const link = await loadLink(pid);
+      if (!link || !isAllowed(link.ownerEmail, list)) continue;
+      const prof = (await db.get(coreTable, `PROFILE#${pid}`, 'META')) as unknown as Profile | undefined;
+      if (!prof) continue;
+      connected.add(normalizeEmail(link.ownerEmail));
+      const days = (await db.query(table, `PROFILE#${pid}`, 'DAY#')).map(toDay);
+      people.push({ profileId: pid, name: prof.name, color: prof.color, ...(prof.picture ? { picture: prof.picture } : {}), total: monthTotal(days, month, challenge.metric) });
+    }
+    const waiting = list.filter((e) => !connected.has(normalizeEmail(e))).map((e) => normalizeEmail(e).split('@')[0]!);
+    // Syncs re-read the last RECENT_DAYS days, so after that a finished month cannot change: remember the result, so
+    // the winner survives people disconnecting or leaving the family later.
+    const final = now().toISOString().slice(0, 10) >= addDays(shiftMonth(month, 1) + '-01', RECENT_DAYS);
+    const result: Leaderboard = { ...challenge, entries: rankTotals(people), waiting, final };
+    if (final) await db.put(table, { ...key, ...result });
+    return result;
   };
 
   const routes: Route[] = [
@@ -156,27 +190,21 @@ export function buildHealthRouter(deps: HealthDeps) {
       },
     },
     {
-      // The family steps challenge. This is the one place health data is shared, and it is only a monthly step total
-      // per person, for people who are connected and still on the allowlist (the allowlist is the family).
+      // The family challenge. This is the one place health data is shared, and it is only a monthly total of the
+      // month's challenge metric per person, for people who are connected and still on the allowlist (the family).
       method: 'GET',
-      path: '/steps/leaderboard',
-      handler: async ({ query }): Promise<StepsLeaderboard> => {
-        const month = query.month ? parse(z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/), query.month) : now().toISOString().slice(0, 7);
-        const list = await allowlist();
-        const people = [];
-        const connected = new Set<string>();
-        for (const idx of await db.query(table, 'LINKS')) {
-          const pid = String(idx.profileId);
-          const link = await loadLink(pid);
-          if (!link || !isAllowed(link.ownerEmail, list)) continue;
-          const prof = (await db.get(coreTable, `PROFILE#${pid}`, 'META')) as unknown as Profile | undefined;
-          if (!prof) continue;
-          connected.add(normalizeEmail(link.ownerEmail));
-          const days = (await db.query(table, `PROFILE#${pid}`, 'DAY#')).map(toDay);
-          people.push({ profileId: pid, name: prof.name, color: prof.color, ...(prof.picture ? { picture: prof.picture } : {}), steps: monthSteps(days, month) });
-        }
-        const waiting = list.filter((e) => !connected.has(normalizeEmail(e))).map((e) => normalizeEmail(e).split('@')[0]!);
-        return { month, entries: rankSteps(people), waiting };
+      path: '/leaderboard',
+      handler: async ({ query }) => board(query.month ? parse(monthParam, query.month) : now().toISOString().slice(0, 7)),
+    },
+    {
+      // Every finished challenge before `before` (default: this month), newest first, so past winners stay visible.
+      method: 'GET',
+      path: '/challenges',
+      handler: async ({ query }) => {
+        const before = query.before ? parse(monthParam, query.before) : now().toISOString().slice(0, 7);
+        const out: Leaderboard[] = [];
+        for (let m = shiftMonth(before, -1); m >= CHALLENGES[0]!.month; m = shiftMonth(m, -1)) out.push(await board(m));
+        return out;
       },
     },
     {

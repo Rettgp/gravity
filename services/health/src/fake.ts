@@ -32,6 +32,7 @@ export function fakeDay(date: string): HealthMetrics {
     sleepAwakeMin: Math.round(between(date, 'awake', 15, 55)),
     bedtime: clock(bed),
     wakeTime: clock(wake),
+    workoutMinutes: Math.round(between(date, 'workout', 0, 60)),
   };
 }
 
@@ -66,6 +67,6 @@ export class FakeGoogle implements GoogleHealth {
   async fetchDays(_access: string, from: string, to: string): Promise<FetchResult> {
     const days: DayMap = new Map();
     for (let d = from; d < to; d = addDays(d, 1)) days.set(d, fakeDay(d));
-    return { days, errors: this.errors, attempted: 7 };
+    return { days, errors: this.errors, attempted: 8 };
   }
 }

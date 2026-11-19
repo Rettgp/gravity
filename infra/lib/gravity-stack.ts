@@ -39,6 +39,8 @@ import { BlockPublicAccess, Bucket, BucketEncryption } from 'aws-cdk-lib/aws-s3'
 import { BucketDeployment, Source } from 'aws-cdk-lib/aws-s3-deployment';
 import { SecretValue } from 'aws-cdk-lib';
 import { StringParameter } from 'aws-cdk-lib/aws-ssm';
+import { CfnBudget } from 'aws-cdk-lib/aws-budgets';
+import { Tags } from 'aws-cdk-lib';
 import type { Construct } from 'constructs';
 import { GravityService, REPO_ROOT } from './gravity-service';
 
@@ -53,6 +55,12 @@ export interface GravityStackProps extends StackProps {
    * is never in CloudFormation: create it by hand as the SecureString /gravity/health/google-client-secret (see README).
    */
   googleHealthClientId?: string;
+  /** Verified SES sender for gift price-drop emails. Optional: without it the planner only logs the alert. */
+  priceAlertFrom?: string;
+  /** Where the monthly cost alert goes. Optional: without it no budget is created. */
+  alertEmail?: string;
+  /** Monthly budget for resources tagged app=gravity. Defaults to $5. */
+  monthlyBudgetUsd?: number;
   /** Built web app (apps/web/dist). Falls back to an empty folder for synth-only runs. */
   webDist?: string;
 }
@@ -142,7 +150,7 @@ export class GravityStack extends Stack {
             "default-src 'self'",
             "script-src 'self'",
             "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data: https://*.googleusercontent.com",
+            "img-src 'self' data: https:",
             "font-src 'self'",
             "connect-src 'self' https://*.amazoncognito.com https://cognito-idp." + region + '.amazonaws.com',
             "worker-src 'self'",
@@ -244,11 +252,14 @@ export class GravityStack extends Stack {
 
     // Glimmer photos: a private bucket the journal function reads and writes. No public access and no presigned
     // URLs, so a photo can only leave through the authenticated API. Retained like the tables: family data is never torn down.
+    // Versioned so an overwritten or deleted photo can be restored for 30 days (a few cents at family scale).
     const photos = new Bucket(this, 'Photos', {
       blockPublicAccess: BlockPublicAccess.BLOCK_ALL,
       encryption: BucketEncryption.S3_MANAGED,
       enforceSSL: true,
       removalPolicy: RemovalPolicy.RETAIN,
+      versioned: true,
+      lifecycleRules: [{ noncurrentVersionExpiration: Duration.days(30) }],
     });
     const journal = new GravityService(this, 'Journal', {
       name: 'journal',
@@ -267,6 +278,21 @@ export class GravityStack extends Stack {
     // Tandoor stays on the NAS; nothing in AWS can reach it, and no Tandoor credentials ever come here.
     new GravityService(this, 'Meals', { name: 'meals', api, authorizer, allowlist, timeout: Duration.seconds(28) });
 
+    // Planner: Christmas + Birthday planner. A daily schedule checks tracked gift prices and emails on a drop (SES, verified identities only).
+    const planner = new GravityService(this, 'Planner', {
+      name: 'planner',
+      api,
+      authorizer,
+      allowlist,
+      timeout: Duration.seconds(60),
+      environment: props.priceAlertFrom?.trim() ? { PRICE_ALERT_FROM: props.priceAlertFrom.trim() } : {},
+    });
+    // Scoped to the sender identity when it is known (a bare email address; a domain sender would need the domain identity).
+    const sesIdentity = props.priceAlertFrom?.trim().replace(/^.*<([^>]+)>\s*$/, '$1') || '*';
+    planner.fn.addToRolePolicy(new PolicyStatement({ actions: ['ses:SendEmail'], resources: [this.formatArn({ service: 'ses', resource: 'identity', resourceName: sesIdentity })] }));
+    new Rule(this, 'PlannerPriceCheck', { schedule: Schedule.expression('cron(0 14 * * ? *)'), targets: [new LambdaFunction(planner.fn)] });
+    new GravityService(this, 'Trips', { name: 'trips', api, authorizer, allowlist, timeout: Duration.seconds(28) });
+
     // ---- Publish the SPA + runtime config ----------------------------------------------------------------------
     const webDist = props.webDist && fs.existsSync(props.webDist) ? props.webDist : path.join(REPO_ROOT, 'infra', 'empty-site');
     fs.mkdirSync(webDist, { recursive: true });
@@ -283,6 +309,27 @@ export class GravityStack extends Stack {
       ],
       memoryLimit: 256,
     });
+
+    // ---- Cost guardrail: every resource carries app=gravity; the budget watches only that tag, not the whole account.
+    // One-time manual step: activate the `app` cost allocation tag in Billing (see README), or the budget sees $0.
+    Tags.of(this).add('app', 'gravity');
+    if (props.alertEmail?.trim()) {
+      const to = [{ subscriptionType: 'EMAIL', address: props.alertEmail.trim() }];
+      const at = (notificationType: string, threshold: number) => ({
+        notification: { notificationType, comparisonOperator: 'GREATER_THAN', threshold, thresholdType: 'PERCENTAGE' },
+        subscribers: to,
+      });
+      new CfnBudget(this, 'MonthlyBudget', {
+        budget: {
+          budgetName: 'gravity-monthly',
+          budgetType: 'COST',
+          timeUnit: 'MONTHLY',
+          budgetLimit: { amount: props.monthlyBudgetUsd ?? 5, unit: 'USD' },
+          costFilters: { TagKeyValue: ['user:app$gravity'] },
+        },
+        notificationsWithSubscribers: [at('ACTUAL', 50), at('ACTUAL', 100), at('FORECASTED', 100)],
+      });
+    }
 
     new CfnOutput(this, 'SiteUrl', { value: siteUrl });
     new CfnOutput(this, 'GoogleRedirectUri', { value: 'https://' + hosted + '/oauth2/idpresponse', description: 'Add this to your Google OAuth client' });

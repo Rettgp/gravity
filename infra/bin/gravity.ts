@@ -25,5 +25,8 @@ new GravityStack(app, 'gravity', {
   googleClientId: need('GOOGLE_CLIENT_ID'),
   googleClientSecret: need('GOOGLE_CLIENT_SECRET'),
   googleHealthClientId: process.env.GOOGLE_HEALTH_CLIENT_ID?.trim() || undefined,
+  priceAlertFrom: process.env.PRICE_ALERT_FROM?.trim() || undefined,
+  alertEmail: process.env.ALERT_EMAIL?.trim() || undefined,
+  monthlyBudgetUsd: Number(process.env.MONTHLY_BUDGET_USD) || undefined,
   webDist: path.resolve(__dirname, '..', '..', 'apps', 'web', 'dist'),
 });

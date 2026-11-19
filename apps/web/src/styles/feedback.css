@@ -1,0 +1,18 @@
+/* Feedback page: glass only (.card, --glass-bg-2, .segmented, .chip, .icon-btn). */
+.fb-group { display: grid; gap: 10px; }
+.fb-group h2 { font-size: 18px; }
+.fb-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.fb-item { display: flex; align-items: flex-start; gap: 4px; padding: 6px 4px 6px 6px; }
+.fb-item.is-done .fb-text { color: var(--muted); }
+.fb-check { flex: none; width: 24px; height: 24px; margin: 10px; accent-color: var(--accent-fill); }
+.fb-body { flex: 1; min-width: 0; display: grid; gap: 6px; padding: 10px 0; }
+.fb-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.fb-tags .chip { min-height: 28px; padding: 0 10px; font-size: 13px; }
+.fb-orig { color: var(--muted); }
+.fb-text { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.fb-meta { margin: 0; font-size: 13px; }
+.fb-areas { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; }
+.fb-areas::-webkit-scrollbar { display: none; }
+.fb-areas .chip { flex: none; min-height: 44px; white-space: nowrap; }
+.fb-empty { display: grid; justify-items: center; gap: 8px; text-align: center; color: var(--muted); }
+.fb-count { justify-self: end; font-size: 12px; }

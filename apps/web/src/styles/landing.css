@@ -1,5 +1,6 @@
 /* Landing: two-stop gradient + dot grid, one shape vocabulary (circles), opacity-led entrance. */
-.landing { position: relative; background: var(--bg); overflow-x: clip; }
+.landing { position: relative; isolation: isolate; overflow-x: clip; }
+.landing::before { content: ""; position: fixed; inset: 0; z-index: -1; background: var(--field); }
 
 .land-nav {
   position: fixed; z-index: 40; top: 16px; left: 50%; transform: translateX(-50%);
@@ -8,7 +9,7 @@
 }
 .land-links { display: flex; gap: 6px; }
 .land-links a { padding: 8px 14px; border-radius: 999px; color: var(--muted); font-weight: 500; font-size: 14px; }
-.land-links a:hover { color: var(--text); background: color-mix(in oklab, var(--surface-2) 70%, transparent); }
+.land-links a:hover { color: var(--text); background: var(--glass-bg-2); }
 .land-nav-cta { display: flex; gap: 6px; justify-content: flex-end; align-items: center; }
 @media (max-width: 640px) {
   .land-nav { grid-template-columns: 1fr auto; }
@@ -42,7 +43,7 @@
   display: grid; place-items: center; border-radius: 50%; color: var(--text);
   transform: translateX(calc(var(--stage) * var(--k) / 2));
   animation: counter var(--d) linear infinite; animation-delay: calc(var(--a) / 360 * var(--d) * -1);
-  background: color-mix(in oklab, var(--surface) 50%, transparent);
+  background: var(--glass-bg);
   -webkit-backdrop-filter: blur(14px) saturate(150%); backdrop-filter: blur(14px) saturate(150%);
   border: 1px solid var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
@@ -63,12 +64,12 @@
 .showcase-head p { max-width: 560px; }
 .frame {
   transform-origin: 50% 0; will-change: transform, opacity; padding: 16px; border-radius: 20px;
-  background: color-mix(in oklab, var(--bg) 88%, var(--surface)); border: 1px solid var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-highlight);
+  background: var(--glass-bg-2); border: 1px solid var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 .frame-skeleton { min-height: 520px; }
 
 .features { display: grid; gap: 16px; grid-template-columns: repeat(3, 1fr); max-width: 1080px; margin: 0 auto; padding: 0 16px 80px; }
-.feature { display: grid; gap: 10px; align-content: start; padding: 24px; border-radius: 24px; background: color-mix(in oklab, var(--surface) 70%, transparent); border: 1px solid var(--border); }
+.feature { display: grid; gap: 10px; align-content: start; padding: 24px; border-radius: 24px; background: var(--glass-bg); -webkit-backdrop-filter: blur(var(--glass-blur)); backdrop-filter: blur(var(--glass-blur)); border: 1px solid var(--glass-border); box-shadow: inset 0 1px 0 var(--glass-highlight), var(--glass-shadow); }
 .feature svg { color: var(--accent); }
 .feature h3 { font-size: 20px; }
 .feature p { color: var(--muted); }

@@ -8,7 +8,7 @@ test.describe('landing', () => {
     await page.goto('/');
 
     await expect(page.getByRole('heading', { level: 1 })).toContainText('Everything your family keeps track of');
-    await expect(page.getByRole('button', { name: /Sign in with Google/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in with test data' })).toBeVisible();
     await page.waitForTimeout(1200); // let the staged entrance finish
     await page.screenshot({ path: ART + '/landing-hero-dark-' + info.project.name + '.png' });
 

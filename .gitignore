@@ -15,3 +15,6 @@ infra/empty-site/
 tandoor-recipes.json
 
 scripts/*.local.ps1
+
+# One-off migration inputs: real family data, never committed
+migration/

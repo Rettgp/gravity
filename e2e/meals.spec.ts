@@ -59,7 +59,7 @@ test.describe('meal plan', () => {
     await meal.getByRole('button', { name: 'Close' }).click();
 
     // Grocery: it is on the list with its quantity, check it off, finish the shop, and it is saved for next time.
-    await page.getByRole('tab', { name: 'Grocery' }).click();
+    await page.goto('/app/meals?tab=grocery'); // the Grocery section link lives in the sidebar group, which may be collapsed
     const toBuy = page.getByRole('region', { name: 'To buy' });
     await expect(toBuy.getByRole('button', { name: new RegExp(oats) })).toContainText('1½ cups');
     await toBuy.getByRole('button', { name: new RegExp(oats) }).click();

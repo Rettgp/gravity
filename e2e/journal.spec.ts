@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { addDays } from '@gravity/shared';
-import { ART, isoToday, signIn, watchErrors } from './helpers';
+import { ART, goTo, isoToday, signIn, watchErrors } from './helpers';
 
 const today = isoToday();
 const saved = (page: Page) => expect(page.locator('.jr-status')).toContainText('Saved');
@@ -438,9 +438,9 @@ test.describe('medicine cabinet', () => {
     expect(errors.filter((e) => !/DevTools/.test(e))).toEqual([]);
   });
 
-  test('the Medicine tile on the dashboard opens the cabinet on today', async ({ page }) => {
+  test('the Medicine nav item opens the cabinet on today', async ({ page }) => {
     await signIn(page, 'dad');
-    await page.getByRole('link', { name: /Medicine/ }).first().click();
+    await goTo(page, 'Medicine');
     await expect(page.getByRole('dialog', { name: 'Medicine cabinet' })).toBeVisible();
     // It opens only that once: reopening today from the calendar must not pop the cabinet again.
     await page.getByRole('button', { name: 'Close medicine cabinet' }).click();

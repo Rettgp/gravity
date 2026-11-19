@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { ART, signIn, watchErrors } from './helpers';
+import { ART, goTo, signIn, watchErrors } from './helpers';
 
 test.describe('health card detail view', () => {
   test('open a card for the big chart, stats and explanation; keyboard, ranges, sleep stages, Esc', async ({ page }, info) => {
@@ -10,7 +10,7 @@ test.describe('health card detail view', () => {
     await signIn(page, 'dad');
     await page.getByRole('button', { name: 'Load demo data' }).click();
     await expect(page.getByRole('button', { name: 'Demo data loaded' })).toBeVisible();
-    await page.getByRole('link', { name: 'Health' }).first().click();
+    await goTo(page, 'Health');
     await page.getByRole('button', { name: 'Connect Google Health' }).click();
     await expect(page.getByText('Google Health connected')).toBeVisible();
     await expect(page.getByRole('progressbar')).toBeHidden({ timeout: 20_000 });

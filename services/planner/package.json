@@ -1,0 +1,14 @@
+{
+  "name": "@gravity/planner",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-sesv2": "^3.700.0",
+    "@gravity/shared": "*",
+    "zod": "^3.24.0"
+  }
+}

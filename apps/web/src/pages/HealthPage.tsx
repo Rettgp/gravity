@@ -1,6 +1,6 @@
 import { useSearchParams } from 'react-router-dom';
 import { HealthView } from '../modules/health/HealthView';
-import { StepsPodium } from '../modules/health/StepsPodium';
+import { ChallengePodium } from '../modules/health/ChallengePodium';
 import { useMe } from '../lib/me';
 
 export function HealthPage() {
@@ -12,7 +12,7 @@ export function HealthPage() {
         <p className="muted">Sleep, heart and activity</p>
         <h1>Health</h1>
       </header>
-      <StepsPodium />
+      <ChallengePodium />
       {me.isLoading && <p className="muted">Loading...</p>}
       {me.isError && <p className="jr-error">Could not load your profile.</p>}
       {me.data && <HealthView profiles={me.data.profiles} defaultProfileId={me.data.defaultProfileId} justConnected={params.get('connected') ?? undefined} />}

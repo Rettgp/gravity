@@ -1,0 +1,131 @@
+/* Glass primitives. Imported right after base.css so module CSS can still override per component.
+   Blur budget: backdrop-filter only on shell chrome, sheets and top-level cards. Repeated things use .glass-row. */
+
+/* Floating chrome and panels (nav pills, landing nav). */
+.glass {
+  position: relative;
+  background:
+    linear-gradient(180deg, color-mix(in oklab, white 16%, transparent) 0%, color-mix(in oklab, white 3%, transparent) 46%, transparent 100%),
+    color-mix(in oklab, var(--surface) 20%, transparent);
+  -webkit-backdrop-filter: blur(28px) saturate(190%) brightness(1.08);
+  backdrop-filter: blur(28px) saturate(190%) brightness(1.08);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    inset 0 -1px 0 color-mix(in oklab, white 6%, transparent),
+    inset 0 0 22px color-mix(in oklab, white 5%, transparent),
+    0 10px 30px -12px color-mix(in oklab, var(--p-500) 45%, transparent);
+}
+/* Lit rim: a gradient hairline that is bright at the top-left edge and fades away, like light catching glass. */
+.glass::before {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(135deg, color-mix(in oklab, white 55%, transparent), transparent 38%, transparent 62%, color-mix(in oklab, var(--cyan) 35%, transparent));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+}
+
+/* The default card. The rim is an inset shadow (no pseudo-element) so components can still use ::before. */
+.glass-card, .card {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-card);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), var(--glass-shadow);
+  padding: 20px;
+}
+/* Repeated or nested cards must not blur (mobile GPU cost): they sit on a plain tinted fill. */
+li.card, details.card, .card .card, .glass-card .glass-card, .card .glass-row {
+  -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--glass-bg-2);
+}
+
+/* Nested row inside a card or list. Never blurred. */
+.glass-row {
+  background: var(--glass-bg-2);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-ctl);
+  padding: 10px 14px;
+}
+
+/* Compact stat tile: label, big number, trend, sparkline slot. */
+.stat { display: grid; gap: 4px; align-content: start; padding: 16px; }
+.stat-label { color: var(--muted); font-size: 13px; font-weight: 500; }
+.stat-value { font-family: var(--font-display); font-size: 28px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.1; }
+.stat-trend { color: var(--muted); font-size: 12px; }
+.stat-trend.up { color: var(--well); }
+.stat-trend.down { color: var(--unwell); }
+.stat-spark { margin-top: 4px; min-height: 28px; color: var(--accent); }
+
+/* Right-hand rail of stacked cards; .with-rail is the two-column page layout that hosts it. */
+.rail { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.with-rail { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1280px) {
+  .with-rail { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
+}
+
+/* Segmented control: a pill track whose children (links or buttons) scroll sideways when they do not fit. */
+.segmented {
+  display: inline-flex; gap: 2px; max-width: 100%; padding: 4px; overflow-x: auto; scrollbar-width: none;
+  border-radius: 999px; background: var(--glass-bg-2); border: 1px solid var(--glass-border);
+}
+.segmented::-webkit-scrollbar { display: none; }
+.segmented > * {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 16px; border: 0; border-radius: 999px;
+  background: transparent; color: var(--muted); font-weight: 500; font-size: 14px; white-space: nowrap;
+}
+
+/* One selected style for every navigable or pickable item: a brighter frosted pill that lifts off the glass,
+   bold text and an accent icon. Never a coloured outline (it reads as a cheap focus ring on glass).
+   Modules opt in with `.is-selected` or the same aria attributes. */
+.sb-link[aria-current='page'], .sb-sublink[aria-current='page'], .menu-item[aria-checked='true'],
+.segmented > [aria-current='page'], .segmented > [aria-checked='true'], .segmented > .on, .is-selected {
+  background: var(--sel-bg); border-color: transparent; color: var(--text); font-weight: 600; box-shadow: var(--sel-shadow);
+}
+:is(.sb-link, .sb-sublink, .menu-item, .segmented > *)[aria-current='page'] svg,
+.menu-item[aria-checked='true'] svg, .segmented > :is([aria-checked='true'], .on) svg, .is-selected svg { color: var(--accent); }
+/* Carousels fade out at whichever edge still has hidden content, so items never butt into a hard cut.
+   `edgeFade.ts` sets data-fade-l / data-fade-r; any horizontal scroller opts in with `data-carousel`. */
+:is(.segmented, .gl-strip, [data-carousel]) { --fade-l: 0px; --fade-r: 0px; }
+:is(.segmented, .gl-strip, [data-carousel])[data-fade-l] { --fade-l: 36px; }
+:is(.segmented, .gl-strip, [data-carousel])[data-fade-r] { --fade-r: 36px; }
+:is(.segmented, .gl-strip, [data-carousel]):is([data-fade-l], [data-fade-r]) {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+}
+
+/* Icon-only buttons sitting on glass are bare icons: no fill, no ring, no circle. The 44px tap area stays invisible.
+   Use `.icon-btn` (or the legacy `.jr-icon-btn` / trips `.tr-icon`). Specificity beats module `.x .btn-ghost` rules. */
+.icon-btn, .btn.btn-ghost:is(.jr-icon-btn, .tr-icon, .icon-btn), .btn:is(.jr-icon-btn, .tr-icon) {
+  display: inline-grid; place-items: center; min-width: 44px; min-height: 44px; width: 44px; height: 44px; padding: 0;
+  border: 0; border-radius: 12px; background: transparent; box-shadow: none; color: var(--muted);
+  transition: color 0.15s, transform 0.15s var(--ease-out);
+}
+.icon-btn:hover, .btn.btn-ghost:is(.jr-icon-btn, .tr-icon, .icon-btn):hover, .btn:is(.jr-icon-btn, .tr-icon):hover { color: var(--accent); background: transparent; filter: none; }
+.icon-btn:active, .btn:is(.jr-icon-btn, .tr-icon, .icon-btn):active { transform: scale(0.9); }
+:is(.icon-btn, .jr-icon-btn, .tr-icon):is(.danger, .btn-danger) { color: color-mix(in oklab, var(--unwell) 80%, var(--muted)); }
+:is(.icon-btn, .jr-icon-btn, .tr-icon):is(.danger, .btn-danger):hover { color: var(--unwell); }
+:is(.icon-btn, .jr-icon-btn, .tr-icon)[disabled] { opacity: 0.35; }
+
+/* A highlighted card (today, the current trip day): an accent glow from behind, still no outline. */
+.is-current {
+  border-color: var(--glass-border);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 0 0 1px color-mix(in oklab, white 35%, transparent), 0 14px 34px -14px color-mix(in oklab, var(--accent-fill) 75%, transparent);
+  background: color-mix(in oklab, var(--accent-fill) 12%, var(--glass-bg));
+}
+
+/* Sheets are chrome too: bottom sheet on phones, side panel on desktop. (body prefix beats journal.css by specificity.) */
+body .jr-sheet {
+  background: color-mix(in oklab, var(--surface) 84%, transparent);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass { background: color-mix(in oklab, var(--surface) 92%, transparent); box-shadow: none; }
+  .glass-card, .card, body .jr-sheet { background: color-mix(in oklab, var(--surface) 92%, transparent); }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass, .glass-card, .card, body .jr-sheet { background: var(--surface); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  li.card, details.card, .card .card, .glass-card .glass-card, .glass-row, .segmented { background: var(--surface-2); }
+}
