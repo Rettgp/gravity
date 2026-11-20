@@ -1,7 +1,8 @@
 import { motion } from 'motion/react'
-import { Plus, Search, X } from 'lucide-react'
+import { Gift, Plus, Search, X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { Link } from 'react-router-dom'
 import { Themed } from './Themed'
 
 export function PageHeader({
@@ -29,6 +30,27 @@ export function AddButton({ label, onClick }: { label: string; onClick: () => vo
     <button className="btn" onClick={onClick}>
       <Plus size={18} strokeWidth={2.5} /> {label}
     </button>
+  )
+}
+
+/** Floating shortcut to the current occasion's Gifts page (Christmas or Birthday), on every screen size. On phones it
+ *  stacks above the page's add button when there is one. */
+export function GiftsFab({ to }: { to: string }) {
+  return createPortal(
+    <Themed>
+      <motion.div
+        className="gifts-fab no-print"
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 24 }}
+      >
+        <Link to={to} aria-label="Go to gifts" title="Gifts">
+          <Gift size={24} aria-hidden="true" />
+          <span className="gifts-fab-text">Gifts</span>
+        </Link>
+      </motion.div>
+    </Themed>,
+    document.body,
   )
 }
 

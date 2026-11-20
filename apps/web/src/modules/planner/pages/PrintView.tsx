@@ -119,6 +119,11 @@ function GiftExport({ gifts, buyer, title, currency }: { gifts: Item[]; buyer: s
           })}
         </Section>
       ))}
+      {list.length > 0 && (
+        <h2 className="pr-grand">
+          Grand total<span className="pr-total">{m(list.reduce((sum, g) => sum + giftCost(g), 0))}</span>
+        </h2>
+      )}
     </>
   )
 }

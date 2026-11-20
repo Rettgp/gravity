@@ -12,6 +12,7 @@ import {
   createHttpFetcher,
   extractImage,
   fetchImage,
+  isBotWall,
   extractPrice,
   fetchPrice,
   isPublicIp,
@@ -452,6 +453,21 @@ describe('prices: Amazon', () => {
     let calls = 0;
     await expect(fetchImage('https://shop.example/p/1', async (u) => (calls++, { html: '<p>none</p>', finalUrl: u }), pause)).resolves.toBeNull();
     expect(calls).toBe(1);
+  });
+
+  it("retries any store's bot wall, then reports it as retryable instead of remembering no photo", async () => {
+    const pause = async () => {};
+    const link = 'https://www.samsclub.com/ip/seville-classics-ultrahd-rolling-workbench/13585924465';
+    const real = '<meta property="og:image" content="https://i5.samsclubimages.com/asr/b58.jpeg">';
+    // Sam's Club answers 200 with exactly this body when it blocks a client.
+    const pages = (list: string[]): FetchPage => async (u) => ({ html: list.shift()!, finalUrl: u });
+    await expect(fetchImage(link, pages(['blocked - redirecting', real]), pause)).resolves.toBe('https://i5.samsclubimages.com/asr/b58.jpeg');
+    const err = await fetchImage(link, pages(['blocked - redirecting', 'blocked - redirecting']), pause).catch((e) => e);
+    expect(err).toBeInstanceOf(PriceError);
+    expect(err.retryable).toBe(true);
+    // A big real page whose scripts merely mention "Captcha" is not a wall.
+    expect(isBotWall('<html>' + 'x'.repeat(10_000) + '<script>loadCaptcha()</script></html>')).toBe(false);
+    expect(isBotWall('<html><title>Access Denied</title></html>')).toBe(true);
   });
 
   it.each([

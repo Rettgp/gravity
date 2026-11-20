@@ -360,20 +360,33 @@ export function extractImage(html: string, baseUrl: string): string | null {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Product photo for a gift link. Amazon intermittently answers with an error or a page without the product
- *  (bot check), so an Amazon link gets a second try, and a miss after that is reported as retryable rather than
- *  "this link has no photo" so the app asks again later instead of remembering a blank forever. */
+// Bot walls that answer 200 instead of the product (Sam's Club / Walmart's "blocked - redirecting", PerimeterX,
+// Akamai, Imperva). Real product pages can mention "captcha" in their scripts, so the bare words only count on a tiny page.
+const BOT_WALL = /blocked - redirecting|px-captcha|Robot or human\?|Pardon Our Interruption|<title>Access Denied<\/title>/i;
+const TINY_WALL = /blocked|captcha|access denied|are you a robot/i;
+export const isBotWall = (html: string) => BOT_WALL.test(html.slice(0, 64 * 1024)) || (html.length < 5000 && TINY_WALL.test(html));
+
+/** Product photo for a gift link. Amazon, and any store that sends a bot wall instead of the product, gets a second
+ *  try; a miss after that is reported as retryable rather than "this link has no photo", so the app asks again on a
+ *  later visit instead of remembering a blank forever. */
 export async function fetchImage(url: string, get: FetchPage, pause: (ms: number) => Promise<unknown> = sleep) {
   const amazonLink = amazon(url) !== null || AMAZON_SHORT.test(hostOf(url));
+  let walled = false;
   for (let attempt = 0; ; attempt++) {
     try {
       const [html, finalUrl, isAmazon] = await productPage(url, get);
       const image = extractImage(html, finalUrl);
-      if (image || !(isAmazon || amazonLink)) return image;
+      walled = !image && isBotWall(html);
+      if (image || !(isAmazon || amazonLink || walled)) return image;
     } catch (e) {
       if (!(amazonLink && e instanceof PriceError)) throw e;
     }
-    if (attempt === 1) throw Object.assign(new PriceError("Amazon didn't send the product page this time; it will try again later"), { retryable: true });
+    if (attempt === 1) {
+      const msg = amazonLink ? "Amazon didn't send the product page this time; it will try again later" : 'The store blocked the photo lookup this time; it will try again later';
+      // Host only (no full link): enough to see which stores block the server.
+      console.warn('link-image: no product page', hostOf(url), walled ? 'bot wall' : 'error or missing photo');
+      throw Object.assign(new PriceError(msg), { retryable: true });
+    }
     await pause(800);
   }
 }
@@ -436,7 +449,8 @@ const money = (currency: string, v: number) => `${currency} ${v.toLocaleString('
 
 export async function sendAlert(gift: Loose, currency: string, { allowlist, sendEmail }: Pick<PriceCtx, 'allowlist' | 'sendEmail'>) {
   const tracker = gift.priceTracker as Loose;
-  const to = String(tracker.email ?? '').toLowerCase();
+  // A hidden gift's alert goes only to the person who hid it.
+  const to = String(gift.hiddenBy || tracker.email || '').toLowerCase();
   if (!isAllowed(to, await allowlist())) return;
   const [base, last] = [tracker.basePrice as number, tracker.lastPrice as number];
   const subject = `Price drop: ${gift.idea ?? ''} is now ${money(currency, last)}`.replace(/\s+/g, ' ').trim();

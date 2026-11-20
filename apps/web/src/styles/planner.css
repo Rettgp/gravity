@@ -463,6 +463,7 @@
 .pr-recipe-cols ul,
 .pr-recipe-cols ol{margin: 6px 0 0; padding-left: 18px;}
 .pr-total{float: right; font-weight: 600;}
+.pr-grand{font-size: 17px; color: var(--t1); padding-top: 6px; border-top: 2px solid var(--gold-400); break-inside: avoid;}
 .pr-gift{break-inside: avoid; display: flex; gap: 12px; align-items: flex-start; padding: 6px 0 8px; border-bottom: 1px solid var(--cream-200);}
 .pr-gift h3{font-size: 14.5px; color: var(--t2); margin: 0 0 4px;}
 .pr-gift dl{display: grid; gap: 2px; margin: 0; font-size: 12.5px;}
@@ -529,3 +530,24 @@ body:has(.planner .print-view) .app-shell::before { background: white; }
 
 .planner .ph-nav > a:not([aria-current]) { color: var(--ink-700); }
 .planner .progress-row.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+/* Gifts shortcut: glass (the add button stays the solid accent one), bottom-right. A labelled pill from 768px,
+   icon-only on phones, where it stacks above the page's add button when there is one. */
+.gifts-fab { position: fixed; z-index: 44; right: calc(24px + env(safe-area-inset-right)); bottom: calc(24px + env(safe-area-inset-bottom)); }
+.gifts-fab a {
+  display: inline-flex; align-items: center; gap: 8px; height: 52px; padding: 0 20px 0 16px; border-radius: 999px;
+  color: var(--text); font-weight: 600; font-size: 15px; text-decoration: none;
+  background: color-mix(in oklab, var(--surface) 80%, transparent); border: 1px solid var(--glass-border); box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%); backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.gifts-fab a:hover { transform: translateY(-2px); background: color-mix(in oklab, var(--surface) 92%, transparent); }
+.gifts-fab a:active { transform: scale(0.96); }
+.gifts-fab svg { color: var(--accent); }
+@media (max-width: 767px) {
+  .gifts-fab { right: calc(18px + env(safe-area-inset-right)); bottom: calc(22px + env(safe-area-inset-bottom)); }
+  body:has(.fab) .gifts-fab { bottom: calc(22px + 56px + 12px + env(safe-area-inset-bottom)); }
+  .gifts-fab a { width: 56px; height: 56px; padding: 0; justify-content: center; border-radius: 18px; }
+  .gifts-fab-text { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { .gifts-fab a { transition: none; } }

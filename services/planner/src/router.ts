@@ -7,6 +7,7 @@ import {
   PLANNER_MAX_ITEM_BYTES,
   PLANNER_MAX_YEAR,
   PLANNER_MIN_YEAR,
+  plannerItemSk,
   createRouter,
   type Db,
   type Route,
@@ -72,6 +73,9 @@ export function buildPlannerRouter({ db, table, allowlist, now = () => new Date(
   const ctx: PriceCtx = { store, allowlist, fetchPage, sendEmail, now };
   const isGiftCollection = (c: string) => (PLANNER_GIFT_COLLECTIONS as readonly string[]).includes(c);
   const ok = { ok: true };
+  /** True when a gift is hidden by someone other than `email` (surprise gifts are private to the hider). */
+  const hiddenFrom = (c: string, doc: Doc | null | undefined, email: string) =>
+    isGiftCollection(c) && !!doc?.hiddenBy && String(doc.hiddenBy).toLowerCase() !== email.toLowerCase();
 
   const routes: Route[] = [
     { method: 'GET', path: '/ping', handler: async () => ok },
@@ -79,11 +83,13 @@ export function buildPlannerRouter({ db, table, allowlist, now = () => new Date(
     {
       method: 'GET',
       path: '/years/:year',
-      handler: async ({ params }) => {
+      handler: async ({ params, user }) => {
         const y = year(params.year!);
         const settings = await store.getSettings(y);
         if (!settings) throw new HttpError(404, 'Year not set up yet');
-        return { year: y, settings, collections: await store.listItems(y) };
+        const collections = await store.listItems(y);
+        for (const [c, items] of Object.entries(collections)) collections[c] = items.filter((d) => !hiddenFrom(c, d, user.email));
+        return { year: y, settings, collections };
       },
     },
     {
@@ -110,19 +116,28 @@ export function buildPlannerRouter({ db, table, allowlist, now = () => new Date(
       handler: async ({ params, body, user }) => {
         const y = year(params.year!);
         const { settings, collections } = validateImport(jsonBody(body, PLANNER_MAX_IMPORT_BYTES));
-        await store.replaceYear(y, { ...settings, year: y }, collections, user.email);
+        // Other users' hidden gifts are untouchable: skip colliding incoming docs and protect them from the delete pass.
+        const locked = new Set<string>();
+        for (const [c, items] of Object.entries(await store.listItems(y))) {
+          for (const d of items) if (hiddenFrom(c, d, user.email)) locked.add(plannerItemSk(c, String(d.id)));
+        }
+        for (const [c, items] of Object.entries(collections)) {
+          collections[c] = items.filter((d) => !locked.has(plannerItemSk(c, String(d.id))));
+          if (isGiftCollection(c)) for (const d of collections[c]!) if (String(d.hiddenBy ?? '').toLowerCase() !== user.email.toLowerCase()) delete d.hiddenBy;
+        }
+        await store.replaceYear(y, { ...settings, year: y }, collections, user.email, locked);
         return ok;
       },
     },
     {
       method: 'POST',
       path: '/years/:year/:collection/:id/check-price',
-      handler: async ({ params }) => {
+      handler: async ({ params, user }) => {
         const y = year(params.year!);
         const c = params.collection!;
         if (!isGiftCollection(c)) throw new HttpError(404, 'Not found');
         const gift = await store.getItem(y, c, itemId(params.id!));
-        if (!gift) throw new HttpError(404, 'Gift not found');
+        if (!gift || hiddenFrom(c, gift, user.email)) throw new HttpError(404, 'Gift not found');
         if (!gift.priceTracker || !gift.link) throw new HttpError(400, "This gift isn't tracking a price");
         return { item: await checkAndSave(ctx, y, gift, c) };
       },
@@ -137,8 +152,15 @@ export function buildPlannerRouter({ db, table, allowlist, now = () => new Date(
         if (!(await store.getSettings(y))) throw new HttpError(404, 'Year not set up yet');
         let doc: Doc = { ...jsonBody(body), id };
         if (isGiftCollection(c)) {
+          const stored = await store.getItem(y, c, id);
+          if (hiddenFrom(c, stored, user.email)) throw new HttpError(404, 'Not found');
+          // The client only says hidden true/false; the server decides whose it is. Omitted keeps the current state.
+          const hidden = doc.hidden ?? !!stored?.hiddenBy;
+          delete doc.hidden;
+          delete doc.hiddenBy;
+          if (hidden === true) doc.hiddenBy = user.email;
           try {
-            doc = mergeTracker(doc, await store.getItem(y, c, id), user.email);
+            doc = mergeTracker(doc, stored, user.email);
           } catch (e) {
             if (e instanceof RangeError) throw new HttpError(400, 'Tracker percentage must be between 1 and 99');
             throw e;
@@ -151,11 +173,12 @@ export function buildPlannerRouter({ db, table, allowlist, now = () => new Date(
     {
       method: 'DELETE',
       path: '/years/:year/items/:collection/:id',
-      handler: async ({ params }) => {
+      handler: async ({ params, user }) => {
         const y = year(params.year!);
         const c = collection(params.collection!);
         const id = itemId(params.id!);
         if (!(await store.getSettings(y))) throw new HttpError(404, 'Year not set up yet');
+        if (hiddenFrom(c, await store.getItem(y, c, id), user.email)) throw new HttpError(404, 'Not found');
         await store.deleteItem(y, c, id);
         return ok;
       },

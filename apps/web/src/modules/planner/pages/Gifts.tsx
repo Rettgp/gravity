@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'motion/react'
-import { Cake, ExternalLink, Gift, Pencil, Printer, Store, TreePine, User, X } from 'lucide-react'
+import { Cake, EyeOff, ExternalLink, Gift, Pencil, Printer, Store, TreePine, User, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
@@ -29,6 +29,8 @@ const FIELDS: Field[] = [
   { key: 'image', label: 'Photo link', type: 'url', placeholder: 'Filled in from the link when the store allows it' },
   { key: 'notes', label: 'Notes', type: 'textarea', rows: 2, placeholder: 'Size, colour, wish-list details…' },
   ...GIFT_TAGS.map((t) => ({ key: t.key, label: t.label, type: 'checkbox' as const, half: true })),
+  // The server stores who hid it (hiddenBy); only they ever see this gift.
+  { key: 'hidden', label: 'Hide from others (surprise)', type: 'checkbox' as const },
 ]
 
 // On birthdays the recipient is whose birthday it is.
@@ -37,14 +39,14 @@ const BIRTHDAY_TAGS = GIFT_TAGS.filter((t) => t.key === 'purchased' || t.key ===
 
 const BIRTHDAY_FIELDS: Field[] = [
   { ...FIELDS[0]!, label: 'Birthday of', type: 'select', options: FAMILY_NAMES, placeholder: 'Choose family member' },
-  ...FIELDS.slice(1).filter((f) => f.type !== 'checkbox' || BIRTHDAY_TAGS.some((t) => t.key === f.key)),
+  ...FIELDS.slice(1).filter((f) => f.type !== 'checkbox' || BIRTHDAY_TAGS.some((t) => t.key === f.key) || f.key === 'hidden'),
 ]
 
 // Store CDNs often block hotlinks; hide the broken image instead of showing an icon.
 const hideImg = (e: SyntheticEvent<HTMLImageElement>) => (e.currentTarget.style.display = 'none')
 
 // The form edits one Cost: bring an old budget-only price into it, and drop the budget so it can't come back.
-const forEdit = (g: Item): Item => ({ ...g, actual: hasCost(g) ? giftCost(g) : '', budget: '' })
+const forEdit = (g: Item): Item => ({ ...g, actual: hasCost(g) ? giftCost(g) : '', budget: '', hidden: !!g.hiddenBy })
 
 function TagIcons({ gift, tags: all, size = 14 }: { gift: Item; tags: GiftTag[]; size?: number }) {
   const tags = all.filter((t) => !!gift[t.key])
@@ -71,6 +73,8 @@ export default function Gifts() {
   const [q, setQ] = useState('')
   const [filters, setFilters] = useState<GiftTagKey[]>([])
   const [people, setPeople] = useState<string[]>([])
+  const [buyerSel, setBuyerSel] = useState<string[]>([]) // lowercased buyer names
+  const toggleBuyer = (n: string) => setBuyerSel((p) => (p.includes(n.toLowerCase()) ? p.filter((x) => x !== n.toLowerCase()) : [...p, n.toLowerCase()]))
   const [openId, setOpenId] = useState<string | null>(null)
   const [picking, setPicking] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -92,6 +96,8 @@ export default function Gifts() {
   // versions sometimes picked wrong) are looked up once more; a new photo replaces it only if one is found.
   // Photos from other hosts, including ones typed in by hand, are left alone.
   const LOOKUP_V = 3
+  // Bump on its own to retry only links still without a photo (4: stores' bot walls were once saved as "no photo").
+  const BLANK_V = 4
   const latest = useRef(all)
   latest.current = all
   const fetching = useRef(new Set<string>())
@@ -100,7 +106,7 @@ export default function Gifts() {
     for (const g of all) {
       const link = String(g.link ?? '').trim()
       const image = String(g.image ?? '')
-      const done = g.imageFor === link && (Number(g.imageTry) >= LOOKUP_V || (image !== '' && !AMAZON_PHOTO.test(image)))
+      const done = g.imageFor === link && (image === '' ? Number(g.imageTry) >= BLANK_V : Number(g.imageTry) >= LOOKUP_V || !AMAZON_PHOTO.test(image))
       if (!link || done || fetching.current.has(g.id)) continue
       fetching.current.add(g.id)
       // One lookup at a time: a burst of requests is what makes stores like Amazon refuse.
@@ -114,7 +120,7 @@ export default function Gifts() {
           )
           .then((found) => {
             const cur = latest.current.find((x) => x.id === g.id)
-            if (cur && String(cur.link ?? '').trim() === link) return save({ ...cur, image: found || cur.image || '', imageFor: link, imageTry: LOOKUP_V })
+            if (cur && String(cur.link ?? '').trim() === link) return save({ ...cur, image: found || cur.image || '', imageFor: link, imageTry: Math.max(LOOKUP_V, BLANK_V) })
           })
           .catch(() => {})
           .finally(() => fetching.current.delete(g.id)),
@@ -151,8 +157,9 @@ export default function Gifts() {
       items
         .filter((g) => !q || `${g.recipient} ${g.idea} ${g.store ?? ''} ${g.buyer ?? ''} ${g.notes ?? ''}`.toLowerCase().includes(q.toLowerCase()))
         .filter((g) => filters.every((f) => g[f]))
+        .filter((g) => !buyerSel.length || buyerSel.includes(String(g.buyer ?? '').trim().toLowerCase()))
         .sort((a, b) => String(a.recipient).localeCompare(b.recipient) || String(a.idea).localeCompare(b.idea)),
-    [items, q, filters],
+    [items, q, filters, buyerSel],
   )
 
   useEffect(() => {
@@ -221,6 +228,23 @@ export default function Gifts() {
           </div>
         </div>
       )}
+      {buyers.length > 0 && (
+        <div className="tag-filter no-print" role="group" aria-label="Filter by buyer">
+          <span className="eyebrow">Buyer</span>
+          <div className="tag-filter-chips">
+            {buyers.map((n) => (
+              <button key={n} type="button" className={`chip ${buyerSel.includes(n.toLowerCase()) ? 'on' : ''}`} aria-pressed={buyerSel.includes(n.toLowerCase())} onClick={() => toggleBuyer(n)}>
+                {n}
+              </button>
+            ))}
+            {buyerSel.length > 0 && (
+              <button type="button" className="subtle-link" onClick={() => setBuyerSel([])}>
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       <div className="tag-filter no-print" role="group" aria-label="Filter by tags">
         <span className="eyebrow">Filter</span>
         <div className="tag-filter-chips">
@@ -254,7 +278,10 @@ export default function Gifts() {
               aria-label={`${g.recipient}: ${g.idea}. Tap to expand`}
             >
               <GiftImage className="gt-img" src={g.image} lazy />
-              <span className="gt-recipient">{g.recipient}</span>
+              <span className="gt-recipient">
+                {g.recipient}
+                {!!g.hiddenBy && <EyeOff size={12} aria-label="Hidden from others" style={{ marginLeft: 4, verticalAlign: -1 }} />}
+              </span>
               <span className="gt-idea">{g.idea}</span>
               <span className="gt-foot">
                 <span className="gt-price">{hasCost(g) ? money(giftCost(g), currency) : '—'}</span>
@@ -274,7 +301,10 @@ export default function Gifts() {
               <motion.div layoutId={`gift-${open.id}`} className="gift-expanded card" transition={{ type: 'spring', stiffness: 420, damping: 36 }} style={{ borderRadius: 20 }}>
                 <div className="ge-head">
                   <div>
-                    <div className="gt-recipient">{open.recipient}</div>
+                    <div className="gt-recipient">
+                      {open.recipient}
+                      {!!open.hiddenBy && <EyeOff size={12} aria-label="Hidden from others" style={{ marginLeft: 4, verticalAlign: -1 }} />}
+                    </div>
                     <div className="ge-idea">{open.idea}</div>
                   </div>
                   <button className="icon-btn" onClick={() => setOpenId(null)} aria-label="Close">

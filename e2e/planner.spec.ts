@@ -37,10 +37,15 @@ test.describe('planner', () => {
     const link = 'https://a.co/d/retry-test';
     const wrongLink = 'https://a.co/d/wrong-photo';
     const keepLink = 'https://www.target.com/p/thing/-/A-1';
+    const walledLink = 'https://www.samsclub.com/ip/thing/1';
     const gifts = [
       { id: 'retry-gift', recipient: 'Nana', idea: 'Old lookup', link, image: '', imageFor: link },
       { id: 'wrong-gift', recipient: 'Nana', idea: 'Picked an ad', link: wrongLink, image: 'https://m.media-amazon.com/images/I/315PBUzfZiL.jpg', imageFor: wrongLink, imageTry: 2 },
       { id: 'keep-gift', recipient: 'Nana', idea: 'Other store', link: keepLink, image: 'https://target.scene7.com/is/image/Target/1', imageFor: keepLink },
+      // Saved blank by version 3, when a store's bot wall still read as "no photo": looked up once more.
+      { id: 'walled-gift', recipient: 'Nana', idea: 'Walled store', link: walledLink, image: '', imageFor: walledLink, imageTry: 3 },
+      // A photo that version 3 already checked is never looked up again.
+      { id: 'done-gift', recipient: 'Nana', idea: 'Checked photo', link: 'https://a.co/d/done', image: 'https://m.media-amazon.com/images/I/done.jpg', imageFor: 'https://a.co/d/done', imageTry: 3 },
     ];
     const ids = gifts.map((g) => g.id);
     await page.route(/\/api\/planner\/years\/\d{4}$/, async (route) => {
@@ -58,9 +63,10 @@ test.describe('planner', () => {
       return route.fulfill({ json: { image: url === link ? 'https://m.media-amazon.com/images/I/retry.jpg' : 'https://m.media-amazon.com/images/I/81right._AC_SL1500_.jpg' } });
     });
     // Answer the saves here so the shared test database never holds these gifts.
-    await page.route(/\/items\/gifts\/(retry|wrong|keep)-gift$/, (route) => route.fulfill({ json: route.request().postDataJSON() }));
+    await page.route(/\/items\/gifts\/(retry|wrong|keep|walled|done)-gift$/, (route) => route.fulfill({ json: route.request().postDataJSON() }));
     const saved = page.waitForRequest((r) => r.method() === 'PUT' && r.url().includes('/items/gifts/retry-gift'));
     const fixed = page.waitForRequest((r) => r.method() === 'PUT' && r.url().includes('/items/gifts/wrong-gift'));
+    const unwalled = page.waitForRequest((r) => r.method() === 'PUT' && r.url().includes('/items/gifts/walled-gift'));
     await openChristmas(page);
     const welcome = page.getByRole('heading', { name: /set up your Christmas/ });
     await expect(welcome.or(page.locator('.planner-head'))).toBeVisible();
@@ -71,14 +77,24 @@ test.describe('planner', () => {
     await expect(page).toHaveURL(/christmas\/dashboard$/); // let the planner's own redirect land before navigating
     await go(page, 'Gifts');
     const body = (await saved).postDataJSON();
-    expect(body).toMatchObject({ image: 'https://m.media-amazon.com/images/I/retry.jpg', imageFor: link, imageTry: 3 });
-    expect((await fixed).postDataJSON()).toMatchObject({ image: 'https://m.media-amazon.com/images/I/81right._AC_SL1500_.jpg', imageTry: 3 });
-    expect(lookups.sort()).toEqual([link, wrongLink].sort()); // the other store's photo is never looked up again
+    expect(body).toMatchObject({ image: 'https://m.media-amazon.com/images/I/retry.jpg', imageFor: link, imageTry: 4 });
+    expect((await fixed).postDataJSON()).toMatchObject({ image: 'https://m.media-amazon.com/images/I/81right._AC_SL1500_.jpg', imageTry: 4 });
+    expect((await unwalled).postDataJSON()).toMatchObject({ image: 'https://m.media-amazon.com/images/I/81right._AC_SL1500_.jpg', imageTry: 4 });
+    expect(lookups.sort()).toEqual([link, wrongLink, walledLink].sort()); // the other store's photo and the checked Amazon photo are never looked up again
     // The photo spans the whole tile (a global img max-width once left a gap on the right).
     const tile = page.getByRole('button', { name: /Other store\. Tap to expand/ });
     const [t, img] = [await tile.boundingBox(), await tile.locator('.gt-img').boundingBox()];
     expect(Math.abs(t!.x + t!.width - (img!.x + img!.width))).toBeLessThan(3);
     expect(Math.abs(t!.x - img!.x)).toBeLessThan(3);
+    // Buyer filter narrows the list (case-insensitively: "mom" and "Mom" are one buyer).
+    Object.assign(gifts[0]!, { buyer: 'Mom' });
+    Object.assign(gifts[2]!, { buyer: 'mom ' });
+    await page.reload();
+    const buyerRow = page.getByRole('group', { name: 'Filter by buyer' });
+    await buyerRow.getByRole('button', { name: 'Mom' }).click();
+    await expect(page.getByRole('button', { name: /Old lookup\. Tap to expand/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Other store\. Tap to expand/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Checked photo\. Tap to expand/ })).toHaveCount(0);
   });
 
   test('gifts, price tracker, budget, to-dos, birthdays, backup, years, print', async ({ page }, info) => {
@@ -207,6 +223,15 @@ test.describe('planner', () => {
     await yes.getByPlaceholder('e.g. Pizza night').blur();
     await expect(yes.getByText(/1\/5 picked/)).toBeVisible();
 
+    // ---- The floating Gifts shortcut follows the occasion and hides on the Gifts page itself ----
+    const giftsFab = page.getByRole('link', { name: 'Go to gifts' });
+    await giftsFab.click();
+    await expect(page).toHaveURL(/birthday\/gifts$/);
+    await expect(giftsFab).toHaveCount(0);
+    await go(page, 'Budget');
+    await giftsFab.click();
+    await expect(page).toHaveURL(/christmas\/gifts$/);
+
     // ---- Backup export, then restore into a different year, then year switch ----
     await occasion(page, 'Christmas');
     const [download] = await Promise.all([page.waitForEvent('download'), tool(page, 'Backup')]);
@@ -235,6 +260,11 @@ test.describe('planner', () => {
     await expect(page.locator('.print-view')).toBeVisible();
     for (const sel of ['.topbar', '.sidebar', '.planner-head']) await expect(page.locator(sel)).toBeHidden();
     await page.getByRole('button', { name: /Back/ }).click();
+
+    // Gift export shows one grand total after the per-recipient groups
+    await page.goto(`${P}/christmas/print?gifts=gifts`);
+    await expect(page.locator('.pr-grand')).toHaveCount(1);
+    await expect(page.locator('.pr-grand')).toContainText('Grand total');
 
     expect(errors.filter((e) => !/example\.test|pic\.png|ERR_NAME_NOT_RESOLVED|Failed to load resource/.test(e))).toEqual([]);
   });

@@ -161,3 +161,65 @@ describe('planner: import', () => {
     expect(await store.getSettings(2026)).toEqual({ name: 'Keep', year: 2026 });
   });
 });
+
+describe('planner: hidden (surprise) gifts', () => {
+  const setup = async () => {
+    const app = makeApp();
+    await app.planner('mom', 'PUT', '/years/2026/settings', {});
+    await app.planner('mom', 'PUT', '/years/2026/items/gifts/g1', { idea: 'Ring', hidden: true });
+    await app.planner('mom', 'PUT', '/years/2026/items/bday_gifts/b1', { idea: 'Book', hidden: true });
+    return app;
+  };
+  const list = async (app: Awaited<ReturnType<typeof setup>>, who: 'mom' | 'dad') => ((await app.planner(who, 'GET', '/years/2026')).body as any).collections;
+
+  it('stores hiddenBy server-side and shows it only to the hider', async () => {
+    const app = await setup();
+    const mine = await list(app, 'mom');
+    expect(mine.gifts[0].hiddenBy).toBe('mom@example.com');
+    expect(mine.gifts[0].hidden).toBeUndefined();
+    expect(mine.bday_gifts).toHaveLength(1);
+    const theirs = await list(app, 'dad');
+    expect(theirs.gifts ?? []).toEqual([]);
+    expect(theirs.bday_gifts ?? []).toEqual([]);
+  });
+
+  it('hides it from others for put, delete and check-price', async () => {
+    const app = await setup();
+    expect((await app.planner('dad', 'PUT', '/years/2026/items/gifts/g1', { idea: 'Overwrite' })).status).toBe(404);
+    expect((await app.planner('dad', 'DELETE', '/years/2026/items/gifts/g1')).status).toBe(404);
+    expect((await app.planner('dad', 'POST', '/years/2026/gifts/g1/check-price')).status).toBe(404);
+    expect(((await list(app, 'mom')).gifts[0]).idea).toBe('Ring');
+  });
+
+  it('lets the hider unhide, and ignores a forged hiddenBy', async () => {
+    const app = await setup();
+    await app.planner('mom', 'PUT', '/years/2026/items/gifts/g1', { idea: 'Ring', hidden: false, hiddenBy: 'dad@example.com' });
+    expect((await list(app, 'dad')).gifts[0].hiddenBy).toBeUndefined();
+    await app.planner('dad', 'PUT', '/years/2026/items/gifts/g2', { idea: 'Tie', hidden: true, hiddenBy: 'mom@example.com' });
+    expect((await list(app, 'mom')).gifts.map((g: any) => g.id)).toEqual(['g1']);
+    expect((await list(app, 'dad')).gifts.find((g: any) => g.id === 'g2').hiddenBy).toBe('dad@example.com');
+  });
+
+  it("keeps another user's hidden gift through an import and drops forged hiddenBy", async () => {
+    const app = await setup();
+    const res = await app.planner('dad', 'POST', '/years/2026/import', {
+      collections: { gifts: [{ id: 'g1', idea: 'Clobber' }, { id: 'g3', idea: 'Mug', hiddenBy: 'mom@example.com' }] },
+    });
+    expect(res.status).toBe(200);
+    const mine = await list(app, 'mom');
+    expect(mine.gifts.find((g: any) => g.id === 'g1').idea).toBe('Ring');
+    expect(mine.bday_gifts).toHaveLength(1);
+    expect(mine.gifts.find((g: any) => g.id === 'g3').hiddenBy).toBeUndefined();
+  });
+
+  it('emails a hidden gift price drop only to the hider', async () => {
+    const app = await setup();
+    app.pages.set('https://shop.test/a', '<meta property="product:price:amount" content="100">');
+    await app.planner('dad', 'PUT', '/years/2026/items/gifts/g9', { idea: 'Watch', link: 'https://shop.test/a', priceTracker: { pct: 10 } });
+    await app.planner('mom', 'PUT', '/years/2026/items/gifts/g9', { idea: 'Watch', link: 'https://shop.test/a', priceTracker: { pct: 10 }, hidden: true });
+    await app.checkPrices();
+    app.pages.set('https://shop.test/a', '<meta property="product:price:amount" content="50">');
+    await app.checkPrices();
+    expect(app.emails.map((e) => e.to)).toEqual(['mom@example.com']);
+  });
+});

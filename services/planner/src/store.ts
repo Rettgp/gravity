@@ -51,9 +51,9 @@ export function plannerStore(db: Db, table: string, now: () => Date) {
       await db.delete(table, hh, plannerSettingsSk(year));
     },
     /** Writes the new rows first, then deletes only old items that are not in the new set, so a failure part-way loses nothing. */
-    async replaceYear(year: number, settings: Doc, collections: Record<string, Doc[]>, user: string) {
+    async replaceYear(year: number, settings: Doc, collections: Record<string, Doc[]>, user: string, locked: Set<string> = new Set()) {
       const pk = plannerYearPk(year, HH);
-      const keep = new Set<string>();
+      const keep = new Set<string>(locked); // locked = other users' hidden gifts: never overwritten or deleted
       for (const [collection, items] of Object.entries(collections)) {
         for (const doc of items) {
           const sk = plannerItemSk(collection, String(doc.id));
