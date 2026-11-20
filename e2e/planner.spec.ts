@@ -95,6 +95,8 @@ test.describe('planner', () => {
     await expect(page.getByRole('button', { name: /Old lookup\. Tap to expand/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /Other store\. Tap to expand/ })).toBeVisible();
     await expect(page.getByRole('button', { name: /Checked photo\. Tap to expand/ })).toHaveCount(0);
+    // The readout at the top counts only that buyer's gifts too.
+    await expect(page.locator('.stat', { hasText: 'Gift ideas' }).locator('.stat-value')).toHaveText('2');
   });
 
   test('gifts, price tracker, budget, to-dos, birthdays, backup, years, print', async ({ page }, info) => {

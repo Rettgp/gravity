@@ -129,7 +129,13 @@ export default function Gifts() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [all])
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const items = useMemo(() => all.filter((g) => !people.length || people.includes(who(g))), [all, people, recipients, birthday])
+  const items = useMemo(
+    () =>
+      all
+        .filter((g) => !people.length || people.includes(who(g)))
+        .filter((g) => !buyerSel.length || buyerSel.includes(String(g.buyer ?? '').trim().toLowerCase())),
+    [all, people, buyerSel, recipients, birthday],
+  )
   const togglePerson = (n: string) => setPeople((p) => (p.includes(n) ? p.filter((x) => x !== n) : [...p, n]))
   const s = giftStats(items)
   const open = items.find((g) => g.id === openId) ?? null
@@ -157,9 +163,8 @@ export default function Gifts() {
       items
         .filter((g) => !q || `${g.recipient} ${g.idea} ${g.store ?? ''} ${g.buyer ?? ''} ${g.notes ?? ''}`.toLowerCase().includes(q.toLowerCase()))
         .filter((g) => filters.every((f) => g[f]))
-        .filter((g) => !buyerSel.length || buyerSel.includes(String(g.buyer ?? '').trim().toLowerCase()))
         .sort((a, b) => String(a.recipient).localeCompare(b.recipient) || String(a.idea).localeCompare(b.idea)),
-    [items, q, filters, buyerSel],
+    [items, q, filters],
   )
 
   useEffect(() => {
